@@ -1,5 +1,6 @@
 services:
   siakadponpes:
+    image: ghcr.io/wahid672/my-siakadponpes:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
