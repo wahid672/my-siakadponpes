@@ -32,34 +32,6 @@ export const Route = createFileRoute("/admin/payment-gateway")({
   component: PaymentGatewaySettings,
 });
 
-const SETTINGS_SQL_SCHEMA = `-- Jalankan di Supabase Dashboard > SQL Editor:
-create table if not exists public.settings (
-  key text primary key,
-  value jsonb not null,
-  updated_at timestamptz not null default now()
-);
-
-grant select, insert, update on public.settings to authenticated;
-grant select on public.settings to anon;
-grant all on public.settings to service_role;
-
-alter table public.settings enable row level security;
-
-create policy "read settings" on public.settings for select to authenticated using (true);
-create policy "public read settings" on public.settings for select to anon using (true);
-create policy "admin write settings" on public.settings for all to authenticated using (true) with check (true);
-
-insert into public.settings (key, value) values (
-  'tripay',
-  '{
-    "mode": "sandbox",
-    "merchant_code": "T10469",
-    "api_key": "DEV-WqLYW5qy3V6x6BAyZbb60xkJLmYXz0cPJAqwM6qj",
-    "private_key": "LX5le-rAseG-TkHmJ-KWo8a-inGpR",
-    "is_enabled": true
-  }'::jsonb
-) on conflict (key) do update set value = excluded.value;`;
-
 export function PaymentGatewaySettings() {
   const [gatewayConfig, setGatewayConfig] = useState<TripaySettings>({
     isEnabled: DEFAULT_TRIPAY_CONFIG.isEnabled,
@@ -74,7 +46,6 @@ export function PaymentGatewaySettings() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState(false);
-  const [showSql, setShowSql] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const callbackUrl =
@@ -107,11 +78,6 @@ export function PaymentGatewaySettings() {
     toast.success("Webhook URL Tripay berhasil disalin ke clipboard");
   }
 
-  function copySql() {
-    navigator.clipboard.writeText(SETTINGS_SQL_SCHEMA);
-    toast.success("SQL Schema tabel 'settings' berhasil disalin!");
-  }
-
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -119,7 +85,7 @@ export function PaymentGatewaySettings() {
       const res = await saveTripaySettings(gatewayConfig);
       if (res.persistedToDb) {
         setConfigSource("database");
-        toast.success("Pengaturan Tripay berhasil disimpan ke Database PostgreSQL!");
+        toast.success("Pengaturan Tripay berhasil disimpan ke Database SQLite!");
       } else {
         setConfigSource("cache");
         toast.success("Pengaturan Tripay berhasil disimpan di cache sistem!");
@@ -245,34 +211,7 @@ export function PaymentGatewaySettings() {
           </div>
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setShowSql(!showSql)}
-          className="text-xs h-8 gap-1.5"
-        >
-          <FileCode2 className="h-3.5 w-3.5" />
-          {showSql ? "Tutup SQL" : "Lihat SQL Migrasi"}
-        </Button>
       </div>
-
-      {showSql && (
-        <div className="rounded-xl border bg-muted/40 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground">SQL Migrasi Supabase (Tabel Settings)</span>
-            <Button size="sm" variant="secondary" onClick={copySql} className="h-7 text-xs gap-1.5">
-              <Copy className="h-3.5 w-3.5" /> Salin SQL
-            </Button>
-          </div>
-          <pre className="p-3 bg-background rounded-lg border font-mono text-[11px] overflow-x-auto text-muted-foreground leading-relaxed max-h-48">
-            {SETTINGS_SQL_SCHEMA}
-          </pre>
-          <p className="text-[11px] text-muted-foreground">
-            Tabel ini digunakan untuk menyimpan pengaturan Tripay di database PostgreSQL Supabase.
-          </p>
-        </div>
-      )}
 
       {/* Warning/Alert Banner */}
       <div className="rounded-xl border bg-card p-4 text-xs text-muted-foreground flex items-center gap-3">

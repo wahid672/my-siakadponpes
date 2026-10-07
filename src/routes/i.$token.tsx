@@ -13,7 +13,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { downloadInvoicePdf } from "@/lib/export-pdf";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/Brand";
 import { InvoicePaymentTable } from "@/components/InvoicePaymentTable";
@@ -128,7 +127,6 @@ function PublicInvoicePage() {
     queryKey: ["public-invoice", token],
     initialData: initialInvoice,
     queryFn: async () => {
-      // 1. Try server function first
       try {
         const res = await getPublicInvoiceServerFn({ data: token });
         if (res?.success && res.invoice) {
@@ -137,26 +135,9 @@ function PublicInvoicePage() {
           return res.invoice;
         }
       } catch (err) {
-        console.warn("Server fn query error:", err);
+        console.warn("Public invoice query error:", err);
       }
-
-      // 2. Direct client query fallback
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("id", token)
-        .maybeSingle();
-
-      if (error || !data) return null;
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user_id).maybeSingle();
-      const { data: payments } = await supabase.from("payments").select("*").eq("invoice_id", data.id).order("paid_at", { ascending: true });
-      return {
-        ...data,
-        active_payment: extractActivePayment(data.notes),
-        notes: cleanInvoiceNotes(data.notes),
-        profile,
-        payments: payments || [],
-      };
+      return null;
     },
   });
 
@@ -392,15 +373,9 @@ function PublicInvoicePage() {
           reference: activePayment?.reference || `TP-${Date.now()}`,
         },
       });
-    } catch {
-      await supabase
-        .from("invoices")
-        .update({
-          status: "paid",
-          paid_at: new Date().toISOString(),
-          notes: cleanInvoiceNotes(inv.notes),
-        })
-        .eq("id", inv.id);
+    } catch (err: any) {
+      setIsProcessingPayment(false);
+      return void toast.error(err.message || "Gagal konfirmasi pembayaran");
     }
 
     localStorage.removeItem(`siakad_active_payment_${inv.id}`);

@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { getAuthState, homeFor } from "@/lib/auth";
 
 export const Route = createFileRoute("/auth/callback")({
@@ -20,15 +19,11 @@ function Callback() {
       if (s) {
         done = true;
         navigate({ to: homeFor(s.role), replace: true });
+      } else {
+        navigate({ to: "/login", replace: true });
       }
     };
-    const { data } = supabase.auth.onAuthStateChange(() => void go());
     void go();
-    const t = setTimeout(() => !done && navigate({ to: "/login", replace: true }), 8000);
-    return () => {
-      data.subscription.unsubscribe();
-      clearTimeout(t);
-    };
   }, [navigate]);
   return (
     <div className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground">

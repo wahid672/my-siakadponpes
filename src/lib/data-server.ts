@@ -283,3 +283,67 @@ export const updateUserRoleServerFn = createServerFn({ method: "POST" })
       return { success: false, message: err.message || "Gagal mengubah peran" };
     }
   });
+
+export const markInvoicePaidServerFn = createServerFn({ method: "POST" })
+  .validator((params: { id: string; total: number; userId: string }) => params)
+  .handler(async ({ data: { id, total, userId } }) => {
+    try {
+      const now = new Date().toISOString();
+      sqlite
+        .prepare("UPDATE invoices SET status = 'paid', paid_at = ? WHERE id = ?")
+        .run(now, id);
+
+      const payId = "pay-" + crypto.randomUUID();
+      sqlite
+        .prepare(
+          "INSERT INTO payments (id, invoice_id, user_id, amount, method, status, paid_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .run(payId, id, userId, total, "manual_admin", "success", now, now);
+
+      return { success: true, message: "Invoice ditandai lunas" };
+    } catch (err: any) {
+      return { success: false, message: err.message || "Gagal memperbarui status" };
+    }
+  });
+
+export const duplicateInvoiceServerFn = createServerFn({ method: "POST" })
+  .validator((inv: any) => inv)
+  .handler(async ({ data: inv }) => {
+    try {
+      const d = new Date();
+      const newNumber = `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
+        d.getDate()
+      ).padStart(2, "0")}-${String(Math.floor(Math.random() * 900) + 100)}`;
+      const id = "inv-" + crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      const itemsStr = typeof inv.items === "string" ? inv.items : JSON.stringify(inv.items || []);
+
+      sqlite
+        .prepare(
+          `INSERT INTO invoices (
+            id, user_id, invoice_number, issue_date, due_date,
+            items, subtotal, tax_rate, discount, total, notes, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)`
+        )
+        .run(
+          id,
+          inv.user_id,
+          newNumber,
+          now.slice(0, 10),
+          now.slice(0, 10),
+          itemsStr,
+          inv.subtotal || 0,
+          inv.tax_rate || 0,
+          inv.discount || 0,
+          inv.total || 0,
+          inv.notes || null,
+          now
+        );
+
+      return { success: true, newNumber, message: `Invoice diduplikasi dengan nomor baru: ${newNumber}` };
+    } catch (err: any) {
+      return { success: false, message: err.message || "Gagal menduplikasi invoice" };
+    }
+  });
+

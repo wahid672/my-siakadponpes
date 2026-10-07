@@ -14,7 +14,6 @@ import {
   ExternalLink,
   MoreHorizontal,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +27,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { rupiah, tanggal } from "@/lib/auth";
 import { useAdminInvoices } from "@/lib/admin-queries";
+import {
+  updateInvoiceStatusServerFn,
+  markInvoicePaidServerFn,
+  duplicateInvoiceServerFn,
+} from "@/lib/data-server";
 
 export const Route = createFileRoute("/admin/invoices/")({
   head: () => ({
@@ -58,55 +62,25 @@ function AdminInvoices() {
 
   async function cancelInvoice(id: string) {
     if (!confirm("Apakah Anda yakin ingin membatalkan invoice ini?")) return;
-    const { error } = await supabase.from("invoices").update({ status: "cancelled" }).eq("id", id);
-    if (error) return toast.error("Gagal membatalkan invoice: " + error.message);
+    const res = await updateInvoiceStatusServerFn({ data: { id, status: "cancelled" } });
+    if (!res.success) return void toast.error(res.message);
     toast.success("Invoice telah dibatalkan");
     qc.invalidateQueries({ queryKey: ["admin-invoices"] });
   }
 
   async function markAsPaid(id: string, total: number, userId: string) {
     if (!confirm("Tandai invoice ini sebagai lunas secara manual?")) return;
-    const { error } = await supabase
-      .from("invoices")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) return toast.error("Gagal memperbarui status: " + error.message);
-
-    // Insert payment record
-    await supabase.from("payments").insert({
-      invoice_id: id,
-      user_id: userId,
-      amount: total,
-      method: "manual_admin",
-    });
-
+    const res = await markInvoicePaidServerFn({ data: { id, total, userId } });
+    if (!res.success) return void toast.error(res.message);
     toast.success("Invoice ditandai lunas");
     qc.invalidateQueries({ queryKey: ["admin-invoices"] });
     qc.invalidateQueries({ queryKey: ["admin-payments"] });
   }
 
   async function duplicateInvoice(inv: any) {
-    const d = new Date();
-    const newNumber = `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
-      d.getDate()
-    ).padStart(2, "0")}-${String(Math.floor(Math.random() * 900) + 100)}`;
-
-    const { error } = await supabase.from("invoices").insert({
-      user_id: inv.user_id,
-      invoice_number: newNumber,
-      issue_date: new Date().toISOString().slice(0, 10),
-      due_date: new Date().toISOString().slice(0, 10),
-      items: inv.items,
-      subtotal: inv.subtotal,
-      tax_rate: inv.tax_rate,
-      discount: inv.discount,
-      total: inv.total,
-      notes: inv.notes,
-      status: "unpaid",
-    });
-
-    if (error) return toast.error("Gagal menduplikasi invoice: " + error.message);
-    toast.success(`Invoice diduplikasi dengan nomor baru: ${newNumber}`);
+    const res = await duplicateInvoiceServerFn({ data: inv });
+    if (!res.success) return void toast.error(res.message);
+    toast.success(res.message);
     qc.invalidateQueries({ queryKey: ["admin-invoices"] });
   }
 
