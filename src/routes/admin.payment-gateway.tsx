@@ -198,7 +198,7 @@ export function PaymentGatewaySettings() {
             <p className="font-semibold text-foreground">
               Penyimpanan:{" "}
               {configSource === "database" ? (
-                <span className="text-emerald-600 font-bold">Database PostgreSQL (Tabel settings)</span>
+                <span className="text-emerald-600 font-bold">Database SQLite (Tabel settings)</span>
               ) : configSource === "cache" ? (
                 <span className="text-blue-600 font-bold">Cache Sistem & LocalStorage</span>
               ) : (
