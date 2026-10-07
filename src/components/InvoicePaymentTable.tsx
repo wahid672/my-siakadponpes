@@ -91,7 +91,7 @@ export function formatPaymentMethod(method?: string | null, reference?: string |
   }
 
   if (m.toLowerCase() === "manual_admin" || m.toLowerCase() === "manual / cash") {
-    return "Transfer Manual / Kasir Pesantren";
+    return "Transfer Manual / Kasir";
   }
 
   return m;

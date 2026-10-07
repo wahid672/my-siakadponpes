@@ -10,9 +10,46 @@ export interface DownloadPdfOptions {
 }
 
 /**
- * Directly downloads the invoice DOM element as a high-resolution A4 PDF file
- * without opening browser print preview.
- * Fully supports modern CSS formats and guarantees desktop-consistent layout on all mobile devices.
+ * Resolves modern CSS color functions like oklch() to standard RGB/Hex
+ * so html2canvas never throws "Unsupported color format" errors on mobile devices.
+ */
+function normalizeColorsToRgb(root: HTMLElement): void {
+  const colorProps = [
+    "color",
+    "backgroundColor",
+    "borderColor",
+    "borderTopColor",
+    "borderBottomColor",
+    "borderLeftColor",
+    "borderRightColor",
+  ];
+  const dummyCanvas = document.createElement("canvas");
+  const ctx = dummyCanvas.getContext("2d");
+  if (!ctx) return;
+
+  const elements = [root, ...Array.from(root.querySelectorAll("*"))] as HTMLElement[];
+  elements.forEach((el) => {
+    if (!el.style) return;
+    const computed = window.getComputedStyle(el);
+    colorProps.forEach((prop) => {
+      const val = (computed as any)[prop];
+      if (val && typeof val === "string" && (val.includes("oklch") || val.includes("color("))) {
+        try {
+          ctx.fillStyle = val;
+          const resolved = ctx.fillStyle;
+          if (resolved) {
+            (el.style as any)[prop] = resolved;
+          }
+        } catch {}
+      }
+    });
+  });
+}
+
+/**
+ * Directly downloads the invoice DOM element as a high-resolution A4 PDF file.
+ * Normalizes layout so mobile phones and desktop browsers produce 100% IDENTICAL,
+ * sharp, and beautiful A4 invoice documents.
  */
 export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Promise<void> {
   const {
@@ -25,7 +62,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
 
   onStart?.();
 
-  let clone: HTMLElement | null = null;
+  let sandbox: HTMLElement | null = null;
 
   try {
     const original = document.getElementById(elementId);
@@ -33,79 +70,209 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
       throw new Error("Dokumen invoice tidak ditemukan di halaman.");
     }
 
-    // Create an off-screen clone with standard A4 paper proportions (800px width)
-    clone = original.cloneNode(true) as HTMLElement;
+    // 1. Create sandbox container in viewport to prevent mobile GPU culling
+    sandbox = document.createElement("div");
+    sandbox.id = "pdf-render-sandbox";
+    sandbox.style.position = "fixed";
+    sandbox.style.top = "0";
+    sandbox.style.left = "0";
+    sandbox.style.width = "800px";
+    sandbox.style.minWidth = "800px";
+    sandbox.style.zIndex = "-9999";
+    sandbox.style.opacity = "0.01";
+    sandbox.style.pointerEvents = "none";
+    sandbox.style.overflow = "hidden";
+    sandbox.style.backgroundColor = "#ffffff";
+
+    // 2. Clone the printable invoice
+    const clone = original.cloneNode(true) as HTMLElement;
     clone.style.width = "800px";
     clone.style.minWidth = "800px";
     clone.style.maxWidth = "800px";
     clone.style.padding = "36px 44px";
-    clone.style.position = "fixed";
-    clone.style.left = "-9999px";
-    clone.style.top = "0";
-    clone.style.zIndex = "-9999";
     clone.style.backgroundColor = "#ffffff";
     clone.style.color = "#0f172a";
     clone.style.boxShadow = "none";
     clone.style.border = "none";
     clone.style.borderRadius = "0";
     clone.style.boxSizing = "border-box";
+    clone.style.fontFamily = "'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif";
+    clone.style.position = "relative";
+    clone.style.overflow = "hidden";
 
-    // 1. Remove interactive/no-print elements
+    // 3. Remove interactive / no-print elements
     clone.querySelectorAll(".no-print").forEach((el) => {
       (el as HTMLElement).style.display = "none";
     });
 
-    // 2. Normalize responsive layout to desktop A4 for mobile browsers:
-    // Force header to horizontal row
-    const headers = clone.querySelectorAll("header");
-    headers.forEach((h) => {
-      const el = h as HTMLElement;
-      el.style.display = "flex";
-      el.style.flexDirection = "row";
-      el.style.justifyContent = "space-between";
-      el.style.alignItems = "flex-start";
-    });
+    // 4. Enforce Desktop A4 Layout for Ribbon Status Badge
+    const ribbon = clone.querySelector(".rotate-45") as HTMLElement;
+    if (ribbon) {
+      ribbon.style.position = "absolute";
+      ribbon.style.right = "-40px";
+      ribbon.style.top = "24px";
+      ribbon.style.width = "180px";
+      ribbon.style.transform = "rotate(45deg)";
+      ribbon.style.textAlign = "center";
+      ribbon.style.padding = "4px 0";
+      ribbon.style.fontSize = "11px";
+      ribbon.style.fontWeight = "800";
+      ribbon.style.letterSpacing = "0.12em";
+      ribbon.style.color = "#ffffff";
+      ribbon.style.boxShadow = "none";
+      ribbon.style.zIndex = "10";
 
-    // Force billed to & QR code section to horizontal row
-    const sections = clone.querySelectorAll("section");
-    sections.forEach((sec) => {
-      const el = sec as HTMLElement;
-      if (el.classList.contains("sm:flex-row")) {
-        el.style.display = "flex";
-        el.style.flexDirection = "row";
-        el.style.justifyContent = "space-between";
-        el.style.alignItems = "flex-start";
+      const txt = ribbon.innerText.trim().toUpperCase();
+      if (txt === "PAID" || txt === "LUNAS") {
+        ribbon.style.backgroundColor = "#059669";
+      } else if (txt === "PENDING") {
+        ribbon.style.backgroundColor = "#d97706";
+      } else {
+        ribbon.style.backgroundColor = "#e11d48";
       }
-    });
+    }
 
-    // Force right-alignment for dates & invoice meta
-    clone.querySelectorAll(".sm\\:text-right").forEach((el) => {
-      (el as HTMLElement).style.textAlign = "right";
-    });
-    clone.querySelectorAll(".sm\\:items-end").forEach((el) => {
-      (el as HTMLElement).style.alignItems = "flex-end";
-    });
-    clone.querySelectorAll(".sm\\:border-t-0").forEach((el) => {
-      (el as HTMLElement).style.borderTop = "none";
-      (el as HTMLElement).style.paddingTop = "0";
-    });
+    // 5. Enforce Desktop A4 Layout for Header (Brand Left, Meta Right)
+    const headerEl = clone.querySelector("header");
+    if (headerEl) {
+      headerEl.style.display = "flex";
+      headerEl.style.flexDirection = "row";
+      headerEl.style.justifyContent = "space-between";
+      headerEl.style.alignItems = "flex-start";
+      headerEl.style.borderBottom = "1px solid #e2e8f0";
+      headerEl.style.paddingBottom = "20px";
+      headerEl.style.gap = "16px";
 
-    // Force all table columns and cells to remain visible (no mobile hiding)
-    clone.querySelectorAll("th, td").forEach((cell) => {
-      const el = cell as HTMLElement;
-      if (el.classList.contains("sm:table-cell") || el.classList.contains("hidden")) {
-        el.style.display = "table-cell";
+      // Header Left (Brand & Institution Subtitle)
+      const headerLeft = headerEl.children[0] as HTMLElement;
+      if (headerLeft) {
+        headerLeft.style.display = "flex";
+        headerLeft.style.flexDirection = "column";
+        headerLeft.style.alignItems = "flex-start";
+        headerLeft.style.paddingRight = "0";
+
+        const logoImg = headerLeft.querySelector("img") as HTMLImageElement;
+        if (logoImg) {
+          logoImg.style.height = "36px";
+          logoImg.style.width = "auto";
+          logoImg.style.objectFit = "contain";
+          logoImg.style.display = "inline-block";
+          logoImg.style.visibility = "visible";
+        }
       }
-    });
 
-    // Disable table overflow scrolling inside PDF
-    clone.querySelectorAll(".overflow-x-auto").forEach((el) => {
-      (el as HTMLElement).style.overflow = "visible";
-    });
+      // Header Right (INVOICE, Invoice Number, Issue & Due Date)
+      const headerRight = headerEl.children[1] as HTMLElement;
+      if (headerRight) {
+        headerRight.style.display = "flex";
+        headerRight.style.flexDirection = "column";
+        headerRight.style.alignItems = "flex-end";
+        headerRight.style.textAlign = "right";
+        headerRight.style.borderTop = "none";
+        headerRight.style.paddingTop = "0";
 
-    document.body.appendChild(clone);
+        const titleH1 = headerRight.querySelector("h1");
+        if (titleH1) {
+          titleH1.style.fontSize = "26px";
+          titleH1.style.fontWeight = "900";
+          titleH1.style.lineHeight = "1";
+          titleH1.style.color = "#0f172a";
+          titleH1.style.margin = "0";
+        }
+      }
+    }
 
-    // Convert all images inside clone to inline Base64 Data URLs so canvas rendering never drops logos
+    // 6. Enforce Desktop A4 Layout for Billed To & QR Code
+    const sections = Array.from(clone.querySelectorAll("section"));
+    const billedSection = sections.find((s) => s.innerText.includes("Ditagihkan") || s.innerText.includes("DITAGIHKAN"));
+    if (billedSection) {
+      billedSection.style.display = "flex";
+      billedSection.style.flexDirection = "row";
+      billedSection.style.justifyContent = "space-between";
+      billedSection.style.alignItems = "flex-start";
+      billedSection.style.borderBottom = "1px solid #e2e8f0";
+      billedSection.style.paddingBottom = "20px";
+      billedSection.style.marginTop = "20px";
+      billedSection.style.gap = "16px";
+
+      const qrWrap = billedSection.children[1] as HTMLElement;
+      if (qrWrap) {
+        qrWrap.style.flexShrink = "0";
+        qrWrap.style.paddingTop = "0";
+        qrWrap.style.textAlign = "center";
+      }
+    }
+
+    // 7. Enforce Desktop A4 Layout for Items Table
+    const table = clone.querySelector("table") as HTMLTableElement;
+    if (table) {
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.fontSize = "12px";
+      table.style.marginTop = "12px";
+
+      table.querySelectorAll("th").forEach((th) => {
+        th.style.borderBottom = "1px solid #cbd5e1";
+        th.style.padding = "8px 6px";
+        th.style.color = "#64748b";
+        th.style.fontWeight = "700";
+        th.style.fontSize = "11px";
+        th.style.textTransform = "uppercase";
+        if (th.classList.contains("text-right")) {
+          th.style.textAlign = "right";
+        }
+      });
+
+      table.querySelectorAll("td").forEach((td) => {
+        td.style.borderBottom = "1px solid #f1f5f9";
+        td.style.padding = "10px 6px";
+        td.style.color = "#0f172a";
+        if (td.classList.contains("text-right")) {
+          td.style.textAlign = "right";
+        }
+      });
+    }
+
+    // 8. Enforce Desktop A4 Layout for Summary Section
+    const summarySection = sections.find((s) => s.innerText.includes("Subtotal") && s.innerText.includes("Total Tagihan"));
+    if (summarySection) {
+      summarySection.style.display = "flex";
+      summarySection.style.justifyContent = "flex-end";
+      summarySection.style.borderTop = "1px solid #e2e8f0";
+      summarySection.style.paddingTop = "16px";
+      summarySection.style.marginTop = "16px";
+
+      const summaryCard = summarySection.querySelector("div");
+      if (summaryCard) {
+        summaryCard.style.width = "300px";
+        summaryCard.style.maxWidth = "300px";
+
+        summaryCard.querySelectorAll("div.flex").forEach((row) => {
+          const r = row as HTMLElement;
+          r.style.display = "flex";
+          r.style.flexDirection = "row";
+          r.style.justifyContent = "space-between";
+          r.style.alignItems = "center";
+          r.style.padding = "2px 0";
+          r.style.fontSize = "12px";
+
+          if (r.innerText.includes("Total Tagihan")) {
+            r.style.borderTop = "1px solid #e2e8f0";
+            r.style.paddingTop = "8px";
+            r.style.marginTop = "4px";
+            r.style.fontWeight = "bold";
+            r.style.fontSize = "15px";
+            const valSpan = r.children[1] as HTMLElement;
+            if (valSpan) {
+              valSpan.style.color = "#0f766e";
+              valSpan.style.fontWeight = "bold";
+            }
+          }
+        });
+      }
+    }
+
+    // 9. Convert all images inside clone to inline Base64 Data URLs
     const origImages = Array.from(original.querySelectorAll("img"));
     const cloneImages = Array.from(clone.querySelectorAll("img"));
 
@@ -115,7 +282,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
           const origImg = origImages[idx];
           let base64Url: string | null = null;
 
-          // 1. If original image is already fully loaded in DOM, extract directly via Canvas
+          // Strategy A: If original image is already fully loaded in DOM, extract directly via Canvas
           if (origImg && origImg.complete && origImg.naturalWidth > 0) {
             try {
               const canvasEl = document.createElement("canvas");
@@ -127,16 +294,16 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
                 base64Url = canvasEl.toDataURL("image/png");
               }
             } catch {
-              // Tainted canvas fallback to fetch
+              // Canvas tainted fallback
             }
           }
 
-          // 2. If not extracted yet and already data URL, keep it
+          // Strategy B: If already data URL
           if (!base64Url && cloneImg.src && cloneImg.src.startsWith("data:")) {
             base64Url = cloneImg.src;
           }
 
-          // 3. Fallback: fetch directly as blob and convert via FileReader (guaranteed for /emblem.png)
+          // Strategy C: Fetch directly as blob and convert via FileReader (guaranteed for /emblem.png)
           if (!base64Url && cloneImg.src) {
             try {
               const res = await fetch(cloneImg.src, { cache: "force-cache" });
@@ -149,16 +316,13 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
                   reader.readAsDataURL(blob);
                 });
               }
-            } catch {
-              // Network fallback
-            }
+            } catch {}
           }
 
           if (base64Url) {
             cloneImg.src = base64Url;
           }
 
-          // Reset styles and error handlers so image is always displayed
           cloneImg.removeAttribute("onerror");
           cloneImg.onerror = null;
           cloneImg.style.display = "inline-block";
@@ -174,10 +338,19 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
       })
     );
 
-    let canvas: HTMLCanvasElement;
+    // 10. Normalize all oklch() colors to standard RGB/Hex
+    normalizeColorsToRgb(clone);
 
+    // Mount to sandbox
+    sandbox.appendChild(clone);
+    document.body.appendChild(sandbox);
+
+    // Wait a brief tick for layout settling
+    await new Promise((r) => setTimeout(r, 60));
+
+    // 11. Render Canvas with html2canvas-pro
+    let canvas: HTMLCanvasElement;
     try {
-      // 1. Try html2canvas-pro with forced desktop emulation windowWidth
       canvas = await html2canvas(clone, {
         scale: 2, // 2x DPI for crystal-sharp print typography
         useCORS: true,
@@ -189,8 +362,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
         imageTimeout: 15000,
       });
     } catch (h2cError) {
-      console.warn("[downloadInvoicePdf] html2canvas-pro fallback:", h2cError);
-      // 2. Resilient fallback using browser's native SVG foreignObject rasterizer
+      console.warn("[downloadInvoicePdf] Primary renderer failed, attempting fallback:", h2cError);
       const { toCanvas } = await import("html-to-image");
       canvas = await toCanvas(clone, {
         pixelRatio: 2,
@@ -199,7 +371,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
       });
     }
 
-    // Create A4 PDF document
+    // 12. Create Standard A4 Portrait PDF Document
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -222,8 +394,8 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
     onError?.(err);
     throw err;
   } finally {
-    if (clone && clone.parentNode) {
-      clone.parentNode.removeChild(clone);
+    if (sandbox && sandbox.parentNode) {
+      sandbox.parentNode.removeChild(sandbox);
     }
   }
 }

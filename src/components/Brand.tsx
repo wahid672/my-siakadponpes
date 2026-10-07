@@ -17,8 +17,9 @@ export function Brand({ size = "md", light = false }: { size?: "sm" | "md" | "lg
           }
         }}
       />
-      <span className={`${txt} font-extrabold tracking-tight ${light ? "text-sidebar-foreground" : "text-brand"}`}>
-        SIAKAD<span className={light ? "text-sidebar-primary" : ""}>PONPES</span>
+      <span className={`${txt} font-black tracking-tight inline-flex items-center`}>
+        <span className={light ? "text-sidebar-foreground" : "text-[#0f766e]"}>SIAKAD</span>
+        <span className={light ? "text-sidebar-primary" : "text-[#10b981]"}>PONPES</span>
       </span>
     </div>
   );
