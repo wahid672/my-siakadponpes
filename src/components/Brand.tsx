@@ -6,9 +6,15 @@ export function Brand({ size = "md", light = false }: { size?: "sm" | "md" | "lg
       <img
         src="/emblem.png"
         alt="SIAKAD PONPES"
-        className={`${img} w-auto object-contain`}
+        className={`${img} w-auto object-contain shrink-0`}
+        crossOrigin="anonymous"
+        loading="eager"
         onError={(e) => {
-          (e.currentTarget as HTMLElement).style.display = "none";
+          // Do not hide if rendering inside printable invoice paper
+          const isPrintPaper = (e.currentTarget as HTMLElement).closest("#printable-invoice-paper");
+          if (!isPrintPaper) {
+            (e.currentTarget as HTMLElement).style.display = "none";
+          }
         }}
       />
       <span className={`${txt} font-extrabold tracking-tight ${light ? "text-sidebar-foreground" : "text-brand"}`}>

@@ -105,15 +105,72 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
 
     document.body.appendChild(clone);
 
-    // Wait for all images and QR codes inside the clone to be fully loaded
-    const images = Array.from(clone.querySelectorAll("img"));
+    // Convert all images inside clone to inline Base64 Data URLs so canvas rendering never drops logos
+    const origImages = Array.from(original.querySelectorAll("img"));
+    const cloneImages = Array.from(clone.querySelectorAll("img"));
+
     await Promise.all(
-      images.map((img) => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
+      cloneImages.map(async (cloneImg, idx) => {
+        try {
+          const origImg = origImages[idx];
+          let base64Url: string | null = null;
+
+          // 1. If original image is already fully loaded in DOM, extract directly via Canvas
+          if (origImg && origImg.complete && origImg.naturalWidth > 0) {
+            try {
+              const canvasEl = document.createElement("canvas");
+              canvasEl.width = origImg.naturalWidth;
+              canvasEl.height = origImg.naturalHeight;
+              const ctx = canvasEl.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(origImg, 0, 0);
+                base64Url = canvasEl.toDataURL("image/png");
+              }
+            } catch {
+              // Tainted canvas fallback to fetch
+            }
+          }
+
+          // 2. If not extracted yet and already data URL, keep it
+          if (!base64Url && cloneImg.src && cloneImg.src.startsWith("data:")) {
+            base64Url = cloneImg.src;
+          }
+
+          // 3. Fallback: fetch directly as blob and convert via FileReader (guaranteed for /emblem.png)
+          if (!base64Url && cloneImg.src) {
+            try {
+              const res = await fetch(cloneImg.src, { cache: "force-cache" });
+              if (res.ok) {
+                const blob = await res.blob();
+                base64Url = await new Promise<string | null>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.onerror = () => resolve(null);
+                  reader.readAsDataURL(blob);
+                });
+              }
+            } catch {
+              // Network fallback
+            }
+          }
+
+          if (base64Url) {
+            cloneImg.src = base64Url;
+          }
+
+          // Reset styles and error handlers so image is always displayed
+          cloneImg.removeAttribute("onerror");
+          cloneImg.onerror = null;
+          cloneImg.style.display = "inline-block";
+          cloneImg.style.visibility = "visible";
+          cloneImg.style.opacity = "1";
+
+          if (cloneImg.decode) {
+            await cloneImg.decode().catch(() => {});
+          }
+        } catch (imgErr) {
+          console.warn("[downloadInvoicePdf] Image conversion warning:", imgErr);
+        }
       })
     );
 
@@ -129,6 +186,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
         logging: false,
         windowWidth: 1024,
         windowHeight: 1440,
+        imageTimeout: 15000,
       });
     } catch (h2cError) {
       console.warn("[downloadInvoicePdf] html2canvas-pro fallback:", h2cError);

@@ -280,6 +280,10 @@ export async function handleTripayCallback(request: Request): Promise<Response> 
       sqlite
         .prepare("UPDATE invoices SET status = 'cancelled', notes = ? WHERE id = ?")
         .run(cleanInvoiceNotes(inv.notes), inv.id);
+    } else if (payload.status === "UNPAID" && inv.status === "unpaid") {
+      sqlite
+        .prepare("UPDATE invoices SET status = 'pending' WHERE id = ?")
+        .run(inv.id);
     }
 
     return new Response(

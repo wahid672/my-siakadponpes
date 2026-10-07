@@ -13,6 +13,8 @@ import {
   Download,
   ExternalLink,
   MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -25,12 +27,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EditInvoiceItemsDialog } from "@/components/EditInvoiceItemsDialog";
 import { rupiah, tanggal } from "@/lib/auth";
 import { useAdminInvoices } from "@/lib/admin-queries";
 import {
   updateInvoiceStatusServerFn,
   markInvoicePaidServerFn,
   duplicateInvoiceServerFn,
+  deleteInvoiceServerFn,
 } from "@/lib/data-server";
 
 export const Route = createFileRoute("/admin/invoices/")({
@@ -50,6 +54,7 @@ function AdminInvoices() {
   const { data = [], isLoading } = useAdminInvoices();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
 
   const filtered = data.filter((r) => {
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
@@ -81,6 +86,20 @@ function AdminInvoices() {
     const res = await duplicateInvoiceServerFn({ data: inv });
     if (!res.success) return void toast.error(res.message);
     toast.success(res.message);
+    qc.invalidateQueries({ queryKey: ["admin-invoices"] });
+  }
+
+  async function handleDeleteInvoice(inv: any) {
+    if (inv.status !== "unpaid") {
+      toast.error("Hanya invoice dengan status Belum Bayar yang dapat dihapus.");
+      return;
+    }
+    if (!confirm(`Hapus invoice #${inv.invoice_number}? Tindakan ini permanen dan tidak dapat dibatalkan.`)) {
+      return;
+    }
+    const res = await deleteInvoiceServerFn({ data: inv.id });
+    if (!res.success) return void toast.error(res.message);
+    toast.success(`Invoice #${inv.invoice_number} berhasil dihapus.`);
     qc.invalidateQueries({ queryKey: ["admin-invoices"] });
   }
 
@@ -188,7 +207,7 @@ function AdminInvoices() {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent align="end" className="w-52">
                         <DropdownMenuItem asChild>
                           <Link to="/invoice/$id" params={{ id: r.id }}>
                             <ExternalLink className="mr-2 h-4 w-4" /> Lihat Invoice
@@ -200,7 +219,29 @@ function AdminInvoices() {
                         <DropdownMenuItem onClick={() => duplicateInvoice(r)}>
                           <Copy className="mr-2 h-4 w-4" /> Duplikasi Invoice
                         </DropdownMenuItem>
+
+                        {/* OPSI KHUSUS STATUS BELUM BAYAR (Bisa Diedit & Dihapus) */}
                         {r.status === "unpaid" && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setEditingInvoice(r)}>
+                              <Pencil className="mr-2 h-4 w-4 text-blue-600" /> Edit Rincian Item
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => markAsPaid(r.id, Number(r.total), r.user_id)}>
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> Tandai Lunas
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => cancelInvoice(r.id)} className="text-muted-foreground">
+                              <XCircle className="mr-2 h-4 w-4" /> Batalkan Invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleDeleteInvoice(r)} className="text-destructive font-medium">
+                              <Trash2 className="mr-2 h-4 w-4" /> Hapus Invoice
+                            </DropdownMenuItem>
+                          </>
+                        )}
+
+                        {/* OPSI KHUSUS STATUS PENDING (Hanya Konfirmasi Lunas / Batal - TIDAK BISA EDIT ATAU HAPUS) */}
+                        {r.status === "pending" && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => markAsPaid(r.id, Number(r.total), r.user_id)}>
@@ -220,6 +261,16 @@ function AdminInvoices() {
           </table>
         </div>
       )}
+
+      {/* Modal Dialog Edit Rincian Item Invoice */}
+      <EditInvoiceItemsDialog
+        isOpen={!!editingInvoice}
+        onClose={() => setEditingInvoice(null)}
+        invoice={editingInvoice}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ["admin-invoices"] });
+        }}
+      />
     </div>
   );
 }

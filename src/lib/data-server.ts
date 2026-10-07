@@ -223,10 +223,63 @@ export const updateInvoiceStatusServerFn = createServerFn({ method: "POST" })
     }
   });
 
+export const updateInvoiceItemsServerFn = createServerFn({ method: "POST" })
+  .validator(
+    (params: {
+      id: string;
+      items: Array<{ description: string; quantity: number; unit_price: number; amount: number }>;
+      tax_rate: number;
+      discount: number;
+      subtotal: number;
+      total: number;
+      notes?: string;
+    }) => params
+  )
+  .handler(async ({ data }) => {
+    try {
+      const existing = sqlite.prepare("SELECT status FROM invoices WHERE id = ?").get(data.id) as any;
+      if (!existing) return { success: false, message: "Invoice tidak ditemukan" };
+      if (existing.status !== "unpaid") {
+        return { success: false, message: "Hanya invoice berstatus Belum Bayar yang dapat diedit." };
+      }
+
+      const itemsStr = JSON.stringify(data.items || []);
+      sqlite
+        .prepare(
+          `UPDATE invoices 
+           SET items = ?,
+               tax_rate = ?,
+               discount = ?,
+               subtotal = ?,
+               total = ?,
+               notes = COALESCE(?, notes)
+           WHERE id = ?`
+        )
+        .run(
+          itemsStr,
+          data.tax_rate ?? 0,
+          data.discount ?? 0,
+          data.subtotal,
+          data.total,
+          data.notes ?? null,
+          data.id
+        );
+
+      return { success: true, message: "Rincian invoice berhasil diperbarui" };
+    } catch (err: any) {
+      return { success: false, message: err.message || "Gagal memperbarui rincian invoice" };
+    }
+  });
+
 export const deleteInvoiceServerFn = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
+      const existing = sqlite.prepare("SELECT status FROM invoices WHERE id = ?").get(id) as any;
+      if (!existing) return { success: false, message: "Invoice tidak ditemukan" };
+      if (existing.status !== "unpaid") {
+        return { success: false, message: "Hanya invoice dengan status Belum Bayar yang dapat dihapus." };
+      }
       sqlite.prepare("DELETE FROM invoices WHERE id = ?").run(id);
       return { success: true, message: "Invoice berhasil dihapus" };
     } catch (err: any) {

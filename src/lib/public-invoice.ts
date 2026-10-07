@@ -134,7 +134,12 @@ export const saveActivePaymentServerFn = createServerFn({ method: "POST" })
 
       const newNotes = embedActivePaymentInNotes(currentInv.notes, paymentData);
       sqlite
-        .prepare("UPDATE invoices SET notes = ? WHERE id = ? OR invoice_number = ?")
+        .prepare(`
+          UPDATE invoices 
+          SET notes = ?,
+              status = CASE WHEN status = 'unpaid' THEN 'pending' ELSE status END
+          WHERE id = ? OR invoice_number = ?
+        `)
         .run(newNotes, invoiceId, invoiceId);
 
       return { success: true };
