@@ -46,6 +46,8 @@ import {
 import { getBankIconUrl, normalizeBankLogoUrl } from "@/lib/bank-data";
 import { rupiah, tanggal } from "@/lib/auth";
 import { ActivePaymentCard, ActivePaymentData } from "@/components/ActivePaymentCard";
+import { InvoiceQrCode } from "@/components/InvoiceQrCode";
+import { formatInvoiceDocName, buildPublicInvoiceUrl } from "@/lib/invoice-utils";
 
 export const Route = createFileRoute("/i/$token")({
   ssr: true,
@@ -203,15 +205,22 @@ function PublicInvoicePage() {
   const isCancelled = inv.status === "cancelled";
   const isExpired = inv.status === "expired";
   const isUnpaid = inv.status === "unpaid";
+  const docTitle = formatInvoiceDocName(inv.invoice_number, inv.profile?.organization);
+
+  useEffect(() => {
+    if (docTitle) {
+      document.title = `${docTitle} — SIAKAD PONPES`;
+    }
+  }, [docTitle]);
 
   function shareWhatsApp() {
-    const url = window.location.href;
+    const url = buildPublicInvoiceUrl(token);
     const text =
       `*Tagihan SIAKAD PONPES*\n` +
       `No. Invoice: ${inv.invoice_number}\n` +
       `Total: ${rupiah(Number(inv.total))}\n` +
       `Status: ${inv.status.toUpperCase()}\n\n` +
-      `Lihat dan bayar invoice Anda secara online tanpa perlu login:\n${url}`;
+      `Selengkapnya: ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
@@ -396,10 +405,11 @@ function PublicInvoicePage() {
     if (!inv) return;
     setIsDownloadingPdf(true);
     toast.info("Menyiapkan dokumen PDF...");
+    const filename = `${formatInvoiceDocName(inv.invoice_number, inv.profile?.organization)}.pdf`;
     try {
       await downloadInvoicePdf({
         elementId: "printable-invoice-paper",
-        filename: `Invoice-${inv.invoice_number}.pdf`,
+        filename,
         onSuccess: () => {
           toast.success("File PDF berhasil diunduh!");
           setIsDownloadingPdf(false);
@@ -510,11 +520,11 @@ function PublicInvoicePage() {
 
             {/* Invoice Meta & Dates */}
             <div className="flex flex-col sm:items-end text-left sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50">
-              <div className="flex flex-wrap items-baseline gap-2 sm:justify-end">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">INVOICE</h1>
-                <span className="font-mono text-xs text-muted-foreground font-semibold">#{inv.invoice_number}</span>
+              <div className="flex flex-col sm:items-end">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground uppercase leading-none">INVOICE</h1>
+                <p className="font-mono text-xs sm:text-sm text-muted-foreground font-semibold mt-1">#{inv.invoice_number}</p>
               </div>
-              <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+              <div className="mt-2.5 space-y-0.5 text-xs text-muted-foreground">
                 <p>
                   <span>Tanggal Terbit: </span>
                   <span className="font-medium text-foreground">{tanggal(inv.issue_date)}</span>
@@ -533,18 +543,25 @@ function PublicInvoicePage() {
             </div>
           </header>
 
-          {/* Billed To */}
-          <section className="mt-6 border-b pb-6">
-            <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Ditagihkan Kepada</h2>
-            <div className="mt-2 space-y-0.5 text-xs sm:text-sm">
-              <p className="font-semibold text-foreground text-sm sm:text-base">
-                {inv.profile?.organization || inv.profile?.full_name || "Lembaga Klien"}
-              </p>
-              {inv.profile?.full_name && inv.profile?.organization && (
-                <p className="text-xs text-muted-foreground">ATTN: {inv.profile.full_name}</p>
-              )}
-              {inv.profile?.address && <p className="text-xs text-muted-foreground">{inv.profile.address}</p>}
-              <p className="text-xs text-muted-foreground">{inv.profile?.email}</p>
+          {/* Billed To & QR Code (Posisi Kotak Merah) */}
+          <section className="mt-6 border-b pb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex-1">
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Ditagihkan Kepada</h2>
+              <div className="mt-2 space-y-0.5 text-xs sm:text-sm">
+                <p className="font-semibold text-foreground text-sm sm:text-base">
+                  {inv.profile?.organization || inv.profile?.full_name || "Lembaga Klien"}
+                </p>
+                {inv.profile?.full_name && inv.profile?.organization && (
+                  <p className="text-xs text-muted-foreground">ATTN: {inv.profile.full_name}</p>
+                )}
+                {inv.profile?.address && <p className="text-xs text-muted-foreground">{inv.profile.address}</p>}
+                <p className="text-xs text-muted-foreground">{inv.profile?.email}</p>
+              </div>
+            </div>
+
+            {/* QR Code Elegan Publik Invoice */}
+            <div className="shrink-0 pt-1 sm:pt-0">
+              <InvoiceQrCode url={buildPublicInvoiceUrl(token)} size={84} label="Pindai Invoice" />
             </div>
           </section>
 

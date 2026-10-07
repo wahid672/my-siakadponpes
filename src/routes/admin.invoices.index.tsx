@@ -85,13 +85,14 @@ function AdminInvoices() {
   }
 
   function shareWhatsApp(inv: any) {
-    const shareUrl = `${window.location.origin}/invoice/${inv.id}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://portal.siakadponpes.com";
+    const shareUrl = `${origin}/i/${inv.id}`;
     const text =
       `*Tagihan SIAKAD PONPES*\n` +
-      `No. Invoice: #${inv.invoice_number}\n` +
+      `No. Invoice: ${inv.invoice_number}\n` +
       `Total: ${rupiah(Number(inv.total))}\n` +
       `Status: ${inv.status.toUpperCase()}\n\n` +
-      `Lihat dan bayar invoice Anda melalui tautan resmi:\n${shareUrl}`;
+      `Selengkapnya: ${shareUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
