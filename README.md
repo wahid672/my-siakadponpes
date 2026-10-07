@@ -28,7 +28,7 @@ Pastikan Docker dan Docker Compose telah terpasang di server Anda.
 docker compose up -d --build
 ```
 
-Aplikasi akan otomatis berjalan di port `3000` (atau port yang ditentukan pada file `.env`).
+Aplikasi akan otomatis berjalan di port `4400` (atau port yang ditentukan pada file `.env`).
 Data database SQLite akan tersimpan secara persisten pada volume `./data/siakad.db`.
 
 ---
@@ -45,7 +45,7 @@ npm install
 npm run dev
 ```
 
-Buka peramban di `http://localhost:3000`.
+Buka peramban di `http://localhost:4400`.
 
 ---
 
@@ -53,9 +53,9 @@ Buka peramban di `http://localhost:3000`.
 
 | Variabel | Deskripsi | Default |
 | :--- | :--- | :--- |
-| `PORT` | Port server aplikasi | `3000` |
+| `PORT` | Port server aplikasi | `4400` |
 | `DATABASE_PATH` | Lokasi file database SQLite | `./data/siakad.db` |
-| `APP_URL` | Domain publik aplikasi untuk Webhook | `http://localhost:3000` |
+| `APP_URL` | Domain publik aplikasi untuk Webhook | `http://localhost:4400` |
 | `TRIPAY_MODE` | Mode Tripay (`sandbox` / `production`) | `sandbox` |
 | `TRIPAY_MERCHANT_CODE` | Kode merchant Tripay | `T10469` |
 | `TRIPAY_API_KEY` | API Key merchant Tripay | - |

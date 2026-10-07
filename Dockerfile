@@ -23,7 +23,7 @@ WORKDIR /app
 RUN apk add --no-cache sqlite-libs
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=4400
 ENV HOST=0.0.0.0
 ENV DATABASE_PATH=/app/data/siakad.db
 
@@ -36,6 +36,6 @@ COPY --from=builder /app/drizzle ./drizzle
 # Create persistent storage directory for SQLite
 RUN mkdir -p /app/data
 
-EXPOSE 3000
+EXPOSE 4400
 
 CMD ["node", ".output/server/index.mjs"]
