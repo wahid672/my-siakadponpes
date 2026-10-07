@@ -122,18 +122,32 @@ export async function testSmtpConnection(
   }
 }
 
+export function getAdminContactPhone(): string {
+  try {
+    const row = sqlite.prepare("SELECT value FROM settings WHERE key = 'general'").get() as { value: string } | undefined;
+    if (row?.value) {
+      const parsed = JSON.parse(row.value);
+      if (parsed.phone) return String(parsed.phone).trim();
+    }
+  } catch (err) {
+    console.warn("[SMTP] Failed to read general settings phone:", err);
+  }
+  return process.env.ADMIN_WHATSAPP || "081234567890";
+}
+
 export async function sendOtpEmail(toEmail: string, otpCode: string): Promise<{ success: boolean; message: string }> {
   const config = getSmtpConfig();
+  const contactPhone = getAdminContactPhone();
 
-  // Always log OTP in server console for development / backup access
+  // Always log OTP in server console for system administrator emergency audit
   console.log(`\n========================================`);
   console.log(`[AUTH OTP CODE] Email: ${toEmail} | Kode: ${otpCode}`);
   console.log(`========================================\n`);
 
   if (!config.isEnabled || !config.user || !config.pass) {
     return {
-      success: true,
-      message: `Kode OTP dibuat: ${otpCode} (SMTP belum aktif, periksa konsol server untuk kode OTP).`,
+      success: false,
+      message: `Layanan pengiriman email OTP sedang dinonaktifkan. Silakan hubungi admin via WhatsApp di ${contactPhone} untuk bantuan.`,
     };
   }
 
@@ -157,7 +171,7 @@ export async function sendOtpEmail(toEmail: string, otpCode: string): Promise<{ 
             </div>
             <p style="margin: 12px 0 0; font-size: 12px; color: #94a3b8;">Kode ini berlaku selama 10 menit. Jangan bagikan kepada siapa pun.</p>
             <p style="margin: 12px 0 0; font-size: 11px; color: #b45309; background: #fef3c7; padding: 8px; border-radius: 6px;">
-              ⚠️ <strong>Penting:</strong> Jika email ini masuk ke folder <strong>Spam / Junk</strong>, silakan tandai sebagai <em>"Bukan Spam"</em> agar pengiriman berikutnya langsung masuk ke kotak masuk utama Anda.
+              ⚠️ <strong>Penting:</strong> Jika email ini masuk ke folder <strong>Spam / Junk</strong>, silakan periksa dan tandai sebagai <em>"Bukan Spam"</em>.
             </p>
           </div>
           <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center;">
@@ -174,8 +188,8 @@ export async function sendOtpEmail(toEmail: string, otpCode: string): Promise<{ 
   } catch (err: any) {
     console.error("[SMTP Send OTP Error]:", err);
     return {
-      success: true, // Keep returning true with fallback note so user is not blocked
-      message: `Email gagal terkirim (${err.message}). Kode OTP Anda: ${otpCode}`,
+      success: false,
+      message: `Sistem pengiriman email OTP sedang mengalami gangguan. Silakan coba beberapa saat lagi atau hubungi kami melalui WhatsApp di ${contactPhone}.`,
     };
   }
 }

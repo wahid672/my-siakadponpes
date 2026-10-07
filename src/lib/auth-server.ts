@@ -119,6 +119,13 @@ export const requestRegisterOtpServerFn = createServerFn({ method: "POST" })
       .run(otpId, cleanEmail, otp, expiresAt, new Date(now).toISOString());
 
     const mailRes = await sendOtpEmail(cleanEmail, otp);
+    if (!mailRes.success) {
+      return {
+        success: false,
+        message: mailRes.message,
+      };
+    }
+
     return {
       success: true,
       message: mailRes.message || `Kode OTP berhasil dikirim ke ${cleanEmail}. Silakan periksa Kotak Masuk atau folder SPAM email Anda.`,
@@ -249,6 +256,13 @@ export const requestResetPasswordOtpServerFn = createServerFn({ method: "POST" }
       .run(otpId, cleanEmail, otp, expiresAt, new Date(now).toISOString());
 
     const mailRes = await sendOtpEmail(cleanEmail, otp);
+    if (!mailRes.success) {
+      return {
+        success: false,
+        message: mailRes.message,
+      };
+    }
+
     return {
       success: true,
       message: mailRes.message || `Kode OTP reset password berhasil dikirim ke ${cleanEmail}. Silakan periksa Kotak Masuk atau folder SPAM email Anda.`,
@@ -386,6 +400,13 @@ export const requestOtpServerFn = createServerFn({ method: "POST" })
       .run(otpId, cleanEmail, otp, expiresAt, new Date(now).toISOString());
 
     const mailRes = await sendOtpEmail(cleanEmail, otp);
+    if (!mailRes.success) {
+      return {
+        success: false,
+        message: mailRes.message,
+      };
+    }
+
     return {
       success: true,
       message: mailRes.message || `Kode OTP telah dikirim ke ${cleanEmail}`,
