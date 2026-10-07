@@ -17,11 +17,14 @@ const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
+import { hashPassword } from "./password-server";
+
 // Initialize tables if they don't exist
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
+    password_hash TEXT,
     role TEXT NOT NULL DEFAULT 'user',
     created_at TEXT NOT NULL
   );
@@ -88,15 +91,25 @@ sqlite.exec(`
   );
 `);
 
+// Auto-migrate: add password_hash column to existing databases if missing
+try {
+  sqlite.exec("ALTER TABLE users ADD COLUMN password_hash TEXT;");
+} catch {}
+
 // Seed default admin and settings if not present
 const defaultAdminEmail = "wahidalimudin672@gmail.com";
-const existingUser = sqlite.prepare("SELECT * FROM users WHERE email = ?").get(defaultAdminEmail);
+const existingUser = sqlite.prepare("SELECT * FROM users WHERE email = ?").get(defaultAdminEmail) as
+  | { id: string; password_hash?: string }
+  | undefined;
+
 if (!existingUser) {
   const adminId = "admin-" + Date.now();
   const now = new Date().toISOString();
-  sqlite.prepare("INSERT INTO users (id, email, role, created_at) VALUES (?, ?, ?, ?)").run(
+  const defaultHash = hashPassword("Admin123!");
+  sqlite.prepare("INSERT INTO users (id, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)").run(
     adminId,
     defaultAdminEmail,
+    defaultHash,
     "admin",
     now
   );
@@ -107,6 +120,10 @@ if (!existingUser) {
     "Pondok Pesantren",
     now
   );
+} else if (!existingUser.password_hash) {
+  // If admin exists but doesn't have password yet, set default Admin123!
+  const defaultHash = hashPassword("Admin123!");
+  sqlite.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(defaultHash, existingUser.id);
 }
 
 // Seed default settings if not present

@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   ShieldCheck,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
+import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 import { PageHeader } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,12 +145,15 @@ function SettingsPage() {
       />
 
       <Tabs defaultValue="institution" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="institution" className="flex items-center gap-2">
-            <Building className="h-4 w-4" /> Profil Lembaga & Invoice
+            <Building className="h-4 w-4" /> Profil Lembaga
           </TabsTrigger>
           <TabsTrigger value="smtp" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" /> SMTP & Email OTP
+            <Mail className="h-4 w-4" /> SMTP Email OTP
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4" /> Ganti Password
           </TabsTrigger>
         </TabsList>
 
@@ -426,6 +431,11 @@ function SettingsPage() {
               </Button>
             </div>
           </form>
+        </TabsContent>
+
+        {/* Tab 3: Keamanan & Ganti Password */}
+        <TabsContent value="security" className="space-y-6">
+          <ChangePasswordCard />
         </TabsContent>
       </Tabs>
 

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 
 export const Route = createFileRoute("/_user/profile")({
   head: () => ({
@@ -128,6 +129,9 @@ function UserProfilePage() {
           </Button>
         </div>
       </form>
+
+      {/* Ganti Kata Sandi */}
+      <ChangePasswordCard />
     </div>
   );
 }
