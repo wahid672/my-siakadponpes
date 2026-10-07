@@ -338,7 +338,7 @@ function PublicInvoicePage() {
             `Lakukan transfer ke rekening ${bank.bankName}: ${bank.accountNumber} atas nama ${bank.accountHolder}.`,
             `Pastikan nominal transfer tepat sebesar ${rupiah(Number(inv.total))}.`,
             bank.instructions || `Tambahkan nomor invoice ${inv.invoice_number} pada berita transfer.`,
-            `Simpan bukti transfer dan klik tombol "Konfirmasi WhatsApp" untuk mengirimkan bukti transfer ke admin pesantren.`,
+            `Simpan bukti transfer dan klik tombol "Konfirmasi WhatsApp" untuk mengirimkan bukti transfer ke admin.`,
           ],
         },
       ],
@@ -676,7 +676,7 @@ function PublicInvoicePage() {
               {/* Tab 1: Manual Bank Transfer */}
               <TabsContent value="manual" className="space-y-3 pt-3">
                 <p className="text-xs text-muted-foreground">
-                  Pilih rekening resmi pesantren untuk transfer langsung tanpa biaya admin gateway:
+                  Pilih rekening resmi untuk transfer langsung tanpa biaya admin gateway:
                 </p>
 
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
