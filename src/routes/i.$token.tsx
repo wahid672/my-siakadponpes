@@ -212,6 +212,7 @@ function PublicInvoicePage() {
   const isPaid = inv.status === "paid";
   const isCancelled = inv.status === "cancelled";
   const isExpired = inv.status === "expired";
+  const isPending = inv.status === "pending";
   const isUnpaid = inv.status === "unpaid";
 
   function shareWhatsApp() {
@@ -440,6 +441,8 @@ function PublicInvoicePage() {
                   ? "bg-rose-500/15 text-rose-600 border border-rose-500/20"
                   : isExpired
                   ? "bg-rose-500/15 text-rose-600 border border-rose-500/20"
+                  : isPending
+                  ? "bg-amber-500/15 text-amber-600 border border-amber-500/20"
                   : "bg-amber-500/15 text-amber-600 border border-amber-500/20"
               }`}
             >
@@ -449,12 +452,14 @@ function PublicInvoicePage() {
                 ? "Dibatalkan (CANCELLED)"
                 : isExpired
                 ? "Kedaluwarsa (EXPIRED)"
+                : isPending
+                ? "Pending (MENUNGGU PEMBAYARAN)"
                 : "Belum Bayar (UNPAID)"}
             </span>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {isUnpaid && !activePayment && (
+            {(isUnpaid || isPending) && !activePayment && (
               <Button onClick={() => setPayModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
                 <CreditCard className="mr-2 h-4 w-4" /> Bayar Sekarang
               </Button>
@@ -480,7 +485,7 @@ function PublicInvoicePage() {
         </div>
 
         {/* Active Payment Card (Always displayed on page if payment was generated) */}
-        {activePayment && isUnpaid && (
+        {activePayment && (isUnpaid || isPending) && (
           <ActivePaymentCard
             payment={activePayment}
             onResetPayment={handleResetPayment}

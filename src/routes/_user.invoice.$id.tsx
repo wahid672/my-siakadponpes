@@ -413,12 +413,12 @@ function InvoiceView() {
           <ArrowLeft className="h-4 w-4" /> Kembali
         </Link>
         <div className="flex flex-wrap gap-2">
-          {inv.status === "unpaid" && !activePayment && (
+          {(inv.status === "unpaid" || inv.status === "pending") && !activePayment && (
             <Button onClick={() => setPayModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
               <CreditCard className="mr-1.5 h-4 w-4" /> Bayar Sekarang
             </Button>
           )}
-          {auth.role === "admin" && inv.status === "unpaid" && (
+          {auth.role === "admin" && (inv.status === "unpaid" || inv.status === "pending") && (
             <Button variant="secondary" onClick={markPaid}>
               <CheckCircle2 className="mr-1.5 h-4 w-4 text-emerald-600" /> Tandai Lunas
             </Button>
@@ -446,7 +446,7 @@ function InvoiceView() {
       </div>
 
       {/* Active Payment Card (Persisted directly on page) */}
-      {activePayment && inv.status === "unpaid" && (
+      {activePayment && (inv.status === "unpaid" || inv.status === "pending") && (
         <ActivePaymentCard
           payment={activePayment}
           onResetPayment={() => setPayModalOpen(true)}
