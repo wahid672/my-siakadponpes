@@ -20,6 +20,7 @@ import {
   completePublicPaymentServerFn,
   saveActivePaymentServerFn,
 } from "@/lib/public-invoice";
+import { downloadInvoicePdf } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/Brand";
 import { InvoicePaymentTable } from "@/components/InvoicePaymentTable";
