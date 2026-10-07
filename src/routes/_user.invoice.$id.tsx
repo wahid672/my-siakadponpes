@@ -503,7 +503,7 @@ function InvoiceView() {
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Ditagihkan Kepada</h2>
           <div className="mt-2 space-y-0.5 text-xs sm:text-sm">
             <p className="font-semibold text-foreground text-sm sm:text-base">
-              {inv.profile?.organization || inv.profile?.full_name || "Wali Santri / Lembaga"}
+              {inv.profile?.organization || inv.profile?.full_name || "Lembaga Klien"}
             </p>
             {inv.profile?.full_name && inv.profile?.organization && (
               <p className="text-xs text-muted-foreground">ATTN: {inv.profile.full_name}</p>

@@ -124,7 +124,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   subtitle: "Sistem Informasi Akademik & Keuangan Pesantren Terpadu",
   email: "wahidalimudin672@gmail.com",
   phone: "081234567890",
-  address: "Kantor Penagihan & Layanan Pembayaran Santri",
+  address: "Kantor Layanan & Penagihan SIAKAD PONPES",
   showAddressInInvoice: false,
   invoicePrefix: "INV",
   defaultNotes: "Pembayaran dapat dilakukan melalui transfer rekening atau QRIS resmi SIAKAD PONPES.",

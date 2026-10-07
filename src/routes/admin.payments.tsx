@@ -43,7 +43,7 @@ function AdminPayments() {
     <div className="space-y-6">
       <PageHeader
         title="Riwayat Pembayaran"
-        sub="Monitor seluruh transaksi masuk dari santri, wali, dan mitra pesantren."
+        sub="Monitor seluruh transaksi masuk dari lembaga dan mitra klien."
       />
 
       {/* Overview Cards */}

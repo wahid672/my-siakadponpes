@@ -3,7 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { getAuthState, homeFor, setLocalSessionToken } from "@/lib/auth";
-import { Mail, Lock, Loader2, ArrowRight, ArrowLeft, KeyRound, UserPlus } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowRight, ArrowLeft, KeyRound, UserPlus, Globe, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,6 +123,18 @@ function LoginPage() {
 
   return (
     <AuthShell>
+      {/* Tautan Menuju Website Utama siakadponpes.com */}
+      <div className="mb-5 flex justify-center">
+        <a
+          href="https://siakadponpes.com/"
+          className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-primary transition-all shadow-2xs"
+        >
+          <Globe className="h-3.5 w-3.5 text-primary" />
+          <span>Website Utama: <strong className="font-semibold text-foreground">siakadponpes.com</strong></span>
+          <ExternalLink className="h-3 w-3 opacity-60" />
+        </a>
+      </div>
+
       {step === "email" ? (
         // FORM TAHAP 1: INPUT EMAIL
         <form onSubmit={handleCheckEmail} className="space-y-5">

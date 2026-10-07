@@ -72,7 +72,7 @@ export function RegisterModal({
       if (!res.success) {
         return toast.error(res.message);
       }
-      toast.success(res.message);
+      toast.success("Kode OTP telah dikirim! Pastikan untuk memeriksa Kotak Masuk atau folder SPAM email Anda.");
       setOtpSent(true);
       setCountdown(60);
     } catch (err: any) {
@@ -136,7 +136,7 @@ export function RegisterModal({
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <Building className="h-5 w-5 text-primary" />
-            Form Pendaftaran Akun Lembaga / Wali
+            Form Pendaftaran Akun Lembaga / Klien
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Lengkapi data di bawah ini untuk membuat akun dan mengakses sistem SIAKAD PONPES.
@@ -251,11 +251,14 @@ export function RegisterModal({
                 required
               />
             </div>
-            {otpSent && (
-              <p className="text-[11px] text-muted-foreground">
-                Kode OTP telah dikirim ke email Anda. Cek folder kotak masuk atau spam.
+            <div className="rounded-md bg-amber-50 border border-amber-200/60 p-2 text-[11px] text-amber-800 space-y-0.5">
+              <p className="font-semibold flex items-center gap-1">
+                ⚠️ Cek Kotak Masuk (Inbox) & Folder SPAM
               </p>
-            )}
+              <p className="text-amber-700">
+                Kode OTP 6-digit dikirim via email. Jika belum muncul di Inbox, silakan periksa folder <strong>Spam / Junk</strong> Anda.
+              </p>
+            </div>
           </div>
 
           {/* 6. Kolom Password (3 Syarat) */}

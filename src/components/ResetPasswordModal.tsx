@@ -66,7 +66,7 @@ export function ResetPasswordModal({
       if (!res.success) {
         return toast.error(res.message);
       }
-      toast.success(res.message);
+      toast.success("Kode OTP reset password telah dikirim! Pastikan untuk memeriksa Kotak Masuk atau folder SPAM email Anda.");
       setOtpSent(true);
       setCountdown(60);
     } catch (err: any) {
@@ -179,6 +179,14 @@ export function ResetPasswordModal({
                 onChange={(e) => setOtpCode(e.target.value)}
                 required
               />
+            </div>
+            <div className="rounded-md bg-amber-50 border border-amber-200/60 p-2 text-[11px] text-amber-800 space-y-0.5">
+              <p className="font-semibold flex items-center gap-1">
+                ⚠️ Cek Kotak Masuk (Inbox) & Folder SPAM
+              </p>
+              <p className="text-amber-700">
+                Kode OTP 6-digit dikirim via email. Jika belum masuk di Inbox, pastikan periksa folder <strong>Spam / Junk</strong> Anda.
+              </p>
             </div>
           </div>
 

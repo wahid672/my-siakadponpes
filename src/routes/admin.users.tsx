@@ -33,9 +33,9 @@ export const Route = createFileRoute("/admin/users")({
   head: () => ({
     meta: [
       { title: "Manajemen Pengguna — SIAKAD PONPES" },
-      { name: "description", content: "Kelola data santri, wali, dan lembaga penerima invoice." },
+      { name: "description", content: "Kelola data klien, PIC lembaga, dan akun penerima invoice." },
       { property: "og:title", content: "Manajemen Pengguna — SIAKAD PONPES" },
-      { property: "og:description", content: "Kelola data santri, wali, dan lembaga penerima invoice." },
+      { property: "og:description", content: "Kelola data klien, PIC lembaga, dan akun penerima invoice." },
     ],
   }),
   component: UsersManagement,
@@ -114,7 +114,7 @@ function UsersManagement() {
     <div className="space-y-6">
       <PageHeader
         title="Manajemen Pengguna"
-        sub="Kelola akun santri, wali murid, ustadz, dan lembaga mitra."
+        sub="Kelola akun klien, penanggung jawab (PIC), dan lembaga mitra."
         action={
           <Button onClick={() => setIsAddOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" /> Tambah Pengguna
@@ -141,7 +141,7 @@ function UsersManagement() {
               variant={roleFilter === r ? "default" : "outline"}
               onClick={() => setRoleFilter(r)}
             >
-              {{ all: "Semua", admin: "Administrator", user: "Pelanggan / Santri" }[r]}
+              {{ all: "Semua", admin: "Administrator", user: "Klien / Lembaga" }[r]}
             </Button>
           ))}
         </div>
@@ -183,7 +183,7 @@ function UsersManagement() {
                 <div className="space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Building className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">{u.organization || "Pribadi / Santri"}</span>
+                    <span className="truncate">{u.organization || "Lembaga / Klien"}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
@@ -248,7 +248,7 @@ function UsersManagement() {
             <div className="space-y-2">
               <Label>Nama Lengkap / Kontak</Label>
               <Input
-                placeholder="Nama pengguna atau wali"
+                placeholder="Nama lengkap PIC atau penanggung jawab"
                 value={newUser.full_name}
                 onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
               />
@@ -276,7 +276,7 @@ function UsersManagement() {
                 value={newUser.role}
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
               >
-                <option value="user">User (Pelanggan / Santri / Wali)</option>
+                <option value="user">User (Klien / Mitra Lembaga)</option>
                 <option value="admin">Administrator</option>
               </select>
             </div>
@@ -349,7 +349,7 @@ function EditUserForm({
         <Input
           value={form.full_name}
           onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-          placeholder="Nama penerima atau wali"
+          placeholder="Nama lengkap PIC penanggung jawab"
         />
       </div>
       <div className="space-y-2">

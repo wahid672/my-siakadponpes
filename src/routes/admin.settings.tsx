@@ -297,7 +297,7 @@ function SettingsPage() {
                   <Mail className="h-5 w-5 text-primary" /> Konfigurasi Server SMTP
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Digunakan untuk mengirimkan 6 digit kode OTP verifikasi masuk ke email santri dan admin.
+                  Digunakan untuk mengirimkan 6 digit kode OTP verifikasi akun ke email pengguna dan admin.
                 </p>
               </div>
               <div className="flex items-center gap-2">

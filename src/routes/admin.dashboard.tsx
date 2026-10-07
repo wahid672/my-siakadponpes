@@ -128,9 +128,9 @@ function AdminDashboard() {
           tone="red"
         />
         <StatCard
-          label="Total Pelanggan"
+          label="Total Lembaga & Klien"
           value={String(userCount)}
-          subtext="Santri, Wali & Lembaga terdaftar"
+          subtext="Lembaga & Klien mitra terdaftar"
           tone="gold"
         />
       </div>

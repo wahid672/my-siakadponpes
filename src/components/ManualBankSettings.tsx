@@ -287,7 +287,7 @@ export function ManualBankSettings() {
           <div>
             <h3 className="font-bold text-base text-foreground">Rekening Transfer Bank Manual</h3>
             <p className="text-xs text-muted-foreground">
-              Pelanggan / wali santri dapat memilih rekening resmi ini dan melakukan transfer langsung tanpa biaya gateway.
+              Klien dan lembaga mitra dapat memilih rekening resmi ini dan melakukan transfer langsung tanpa biaya gateway.
             </p>
           </div>
         </div>
@@ -333,7 +333,7 @@ export function ManualBankSettings() {
           <CreditCard className="mx-auto h-10 w-10 text-muted-foreground/60 mb-3" />
           <h4 className="font-semibold text-base">Belum Ada Rekening Bank Manual</h4>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-            Tambahkan rekening bank resmi pesantren agar wali santri dapat mentransfer langsung ke rekening yayasan.
+            Tambahkan rekening bank resmi agar lembaga klien dapat mentransfer langsung ke rekening Anda.
           </p>
           <Button onClick={handleOpenCreate} size="sm" className="mt-4">
             <Plus className="mr-2 h-4 w-4" /> Tambah Rekening Sekarang

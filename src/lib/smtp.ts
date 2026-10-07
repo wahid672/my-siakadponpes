@@ -156,6 +156,9 @@ export async function sendOtpEmail(toEmail: string, otpCode: string): Promise<{ 
               ${otpCode}
             </div>
             <p style="margin: 12px 0 0; font-size: 12px; color: #94a3b8;">Kode ini berlaku selama 10 menit. Jangan bagikan kepada siapa pun.</p>
+            <p style="margin: 12px 0 0; font-size: 11px; color: #b45309; background: #fef3c7; padding: 8px; border-radius: 6px;">
+              ⚠️ <strong>Penting:</strong> Jika email ini masuk ke folder <strong>Spam / Junk</strong>, silakan tandai sebagai <em>"Bukan Spam"</em> agar pengiriman berikutnya langsung masuk ke kotak masuk utama Anda.
+            </p>
           </div>
           <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center;">
             Jika Anda tidak meminta kode ini, abaikan pesan ini dengan aman.
@@ -164,7 +167,10 @@ export async function sendOtpEmail(toEmail: string, otpCode: string): Promise<{ 
       `,
     });
 
-    return { success: true, message: "Kode OTP berhasil dikirim ke email Anda." };
+    return {
+      success: true,
+      message: "Kode OTP berhasil dikirim! Silakan periksa Kotak Masuk (Inbox) atau folder SPAM email Anda.",
+    };
   } catch (err: any) {
     console.error("[SMTP Send OTP Error]:", err);
     return {

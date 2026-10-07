@@ -11,9 +11,15 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <p className="mt-3 text-sm text-muted-foreground">Sistem Informasi Akademik Pondok Pesantren</p>
         </div>
         <div className="rounded-2xl border bg-card p-7 shadow-card sm:p-8">{children}</div>
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} SIAKAD PONPES · <span className="text-accent-foreground">Invoice & Payment</span>
-        </p>
+        <div className="mt-6 flex flex-col items-center gap-2 text-xs text-muted-foreground">
+          <a
+            href="https://siakadponpes.com/"
+            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+          >
+            ← Kembali ke Website Utama siakadponpes.com
+          </a>
+          <p>© {new Date().getFullYear()} SIAKAD PONPES · Invoice & Layanan Klien Lembaga</p>
+        </div>
       </div>
     </main>
   );

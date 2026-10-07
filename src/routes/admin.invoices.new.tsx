@@ -37,7 +37,7 @@ const SAMPLE_PRESETS = [
   { description: "Aplikasi Sistem Informasi Akademik Pondok Pesantren Terintegrasi", amount: 3500000, unit: "Lisensi", quantity: 1 },
   { description: "Paket Notifikasi WhatsApp 1 Tahun 1 Device", amount: 600000, unit: "Tahun", quantity: 1 },
   { description: "Biaya Registrasi & Setup Awal", amount: 250000, unit: "Paket", quantity: 1 },
-  { description: "Aplikasi Android Wali Santri", amount: 1500000, unit: "Modul", quantity: 1 },
+  { description: "Modul Layanan Mobile Android Lembaga", amount: 1500000, unit: "Modul", quantity: 1 },
 ];
 
 export function NewInvoice() {
@@ -136,7 +136,7 @@ export function NewInvoice() {
 
       <PageHeader
         title="Buat Invoice Baru"
-        sub="Terbitkan tagihan baru untuk pesantren, santri, atau wali santri."
+        sub="Terbitkan tagihan baru untuk lembaga, pondok pesantren, dan klien mitra."
       />
 
       <div className="space-y-8 rounded-2xl border bg-card p-6 md:p-8 shadow-xs">

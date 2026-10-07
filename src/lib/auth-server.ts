@@ -121,7 +121,7 @@ export const requestRegisterOtpServerFn = createServerFn({ method: "POST" })
     const mailRes = await sendOtpEmail(cleanEmail, otp);
     return {
       success: true,
-      message: mailRes.message || `Kode OTP pendaftaran berhasil dikirim ke ${cleanEmail}`,
+      message: mailRes.message || `Kode OTP berhasil dikirim ke ${cleanEmail}. Silakan periksa Kotak Masuk atau folder SPAM email Anda.`,
     };
   });
 
@@ -251,7 +251,7 @@ export const requestResetPasswordOtpServerFn = createServerFn({ method: "POST" }
     const mailRes = await sendOtpEmail(cleanEmail, otp);
     return {
       success: true,
-      message: mailRes.message || `Kode OTP reset password berhasil dikirim ke ${cleanEmail}`,
+      message: mailRes.message || `Kode OTP reset password berhasil dikirim ke ${cleanEmail}. Silakan periksa Kotak Masuk atau folder SPAM email Anda.`,
     };
   });
 
