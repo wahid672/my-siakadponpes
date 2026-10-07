@@ -38,8 +38,8 @@ export function AppShell({ role, email, children }: { role: Role; email: string;
         ]
       : [
           { to: "/dashboard", label: "Tagihan Saya", icon: FileText },
-          { to: "/dashboard/payments", label: "Riwayat Bayar", icon: CreditCard },
-          { to: "/dashboard/profile", label: "Profil Saya", icon: User },
+          { to: "/payments", label: "Riwayat Bayar", icon: CreditCard },
+          { to: "/profile", label: "Profil Saya", icon: User },
         ];
 
   async function logout() {

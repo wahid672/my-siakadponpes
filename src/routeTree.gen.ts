@@ -24,6 +24,8 @@ import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as DashboardPaymentsRouteImport } from './routes/dashboard.payments'
+import { Route as DashboardProfileRouteImport } from './routes/dashboard.profile'
 import { Route as ITokenRouteImport } from './routes/i.$token'
 import { Route as LoginIndexRouteImport } from './routes/login.index'
 import { Route as LoginVerifyRouteImport } from './routes/login.verify'
@@ -105,6 +107,16 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardPaymentsRoute = DashboardPaymentsRouteImport.update({
+  id: '/dashboard/payments',
+  path: '/dashboard/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardProfileRoute = DashboardProfileRouteImport.update({
+  id: '/dashboard/profile',
+  path: '/dashboard/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ITokenRoute = ITokenRouteImport.update({
   id: '/i/$token',
   path: '/i/$token',
@@ -151,6 +163,8 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/dashboard/payments': typeof DashboardPaymentsRoute
+  '/dashboard/profile': typeof DashboardProfileRoute
   '/i/$token': typeof ITokenRoute
   '/login/verify': typeof LoginVerifyRoute
   '/login/': typeof LoginIndexRoute
@@ -173,6 +187,8 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/dashboard/payments': typeof DashboardPaymentsRoute
+  '/dashboard/profile': typeof DashboardProfileRoute
   '/i/$token': typeof ITokenRoute
   '/login/verify': typeof LoginVerifyRoute
   '/login': typeof LoginIndexRoute
@@ -197,6 +213,8 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/dashboard/payments': typeof DashboardPaymentsRoute
+  '/dashboard/profile': typeof DashboardProfileRoute
   '/i/$token': typeof ITokenRoute
   '/login/verify': typeof LoginVerifyRoute
   '/login/': typeof LoginIndexRoute
@@ -221,6 +239,8 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/auth/callback'
+    | '/dashboard/payments'
+    | '/dashboard/profile'
     | '/i/$token'
     | '/login/verify'
     | '/login/'
@@ -243,6 +263,8 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/auth/callback'
+    | '/dashboard/payments'
+    | '/dashboard/profile'
     | '/i/$token'
     | '/login/verify'
     | '/login'
@@ -266,6 +288,8 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/auth/callback'
+    | '/dashboard/payments'
+    | '/dashboard/profile'
     | '/i/$token'
     | '/login/verify'
     | '/login/'
@@ -279,6 +303,8 @@ export interface RootRouteChildren {
   UserRoute: typeof UserRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
+  DashboardPaymentsRoute: typeof DashboardPaymentsRoute
+  DashboardProfileRoute: typeof DashboardProfileRoute
   ITokenRoute: typeof ITokenRoute
   LoginVerifyRoute: typeof LoginVerifyRoute
   LoginIndexRoute: typeof LoginIndexRoute
@@ -391,6 +417,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/payments': {
+      id: '/dashboard/payments'
+      path: '/dashboard/payments'
+      fullPath: '/dashboard/payments'
+      preLoaderRoute: typeof DashboardPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/profile': {
+      id: '/dashboard/profile'
+      path: '/dashboard/profile'
+      fullPath: '/dashboard/profile'
+      preLoaderRoute: typeof DashboardProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/i/$token': {
       id: '/i/$token'
       path: '/i/$token'
@@ -485,6 +525,8 @@ const rootRouteChildren: RootRouteChildren = {
   UserRoute: UserRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
+  DashboardPaymentsRoute: DashboardPaymentsRoute,
+  DashboardProfileRoute: DashboardProfileRoute,
   ITokenRoute: ITokenRoute,
   LoginVerifyRoute: LoginVerifyRoute,
   LoginIndexRoute: LoginIndexRoute,
