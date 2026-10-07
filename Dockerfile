@@ -18,6 +18,7 @@ RUN npm install --include=optional
 COPY . .
 
 ENV NODE_ENV=production
+ENV NITRO_PRESET=node-server
 RUN npm run build
 
 # Stage 2: Production Runner
