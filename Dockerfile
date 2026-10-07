@@ -1,11 +1,16 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: Dependencies & Builder
-FROM node:22-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 
-# Install native dependencies required for better-sqlite3 compilation
-RUN apk add --no-cache python3 make g++
+# Install build dependencies if needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm install --include=optional
@@ -16,11 +21,14 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 2: Production Runner
-FROM node:22-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apk add --no-cache sqlite-libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sqlite3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV PORT=4400
