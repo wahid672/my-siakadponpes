@@ -21,6 +21,28 @@ export const DEFAULT_TRIPAY_CONFIG: TripaySettings = {
   isEnabled: true,
 };
 
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  fromEmail: string;
+  fromName: string;
+  isEnabled: boolean;
+}
+
+export const DEFAULT_SMTP_CONFIG: SmtpConfig = {
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  user: "",
+  pass: "",
+  fromEmail: "admin@siakadponpes.com",
+  fromName: "SIAKAD PONPES",
+  isEnabled: false,
+};
+
 const STORAGE_KEY = "siakad_tripay_settings";
 
 export interface SaveSettingsResult {

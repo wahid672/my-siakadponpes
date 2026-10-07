@@ -27,13 +27,14 @@ import {
   saveGeneralSettings,
   GeneralSettings,
   DEFAULT_GENERAL_SETTINGS,
+  SmtpConfig,
+  DEFAULT_SMTP_CONFIG,
 } from "@/lib/settings";
 import {
   getSmtpSettingsServerFn,
   saveSmtpSettingsServerFn,
   testSmtpSettingsServerFn,
 } from "@/lib/settings-server";
-import { SmtpConfig, DEFAULT_SMTP_CONFIG } from "@/lib/smtp";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({

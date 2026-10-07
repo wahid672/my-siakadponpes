@@ -1,51 +1,85 @@
 import nodemailer from "nodemailer";
 import { sqlite } from "./db";
+import { SmtpConfig, DEFAULT_SMTP_CONFIG } from "./settings";
 
-export interface SmtpConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  user: string;
-  pass: string;
-  fromEmail: string;
-  fromName: string;
-  isEnabled: boolean;
+export type { SmtpConfig };
+export { DEFAULT_SMTP_CONFIG };
+
+function createSmtpTransporter(config: SmtpConfig) {
+  const port = Number(config.port) || 465;
+  // If port 465 -> SSL/TLS (secure: true)
+  // If port 587 or 25 -> STARTTLS (secure: false)
+  // Otherwise respect config.secure
+  const secure = port === 465 ? true : port === 587 || port === 25 ? false : Boolean(config.secure);
+
+  return nodemailer.createTransport({
+    host: config.host.trim(),
+    port,
+    secure,
+    auth: {
+      user: config.user.trim(),
+      pass: config.pass.trim(),
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
 }
 
-export const DEFAULT_SMTP_CONFIG: SmtpConfig = {
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  user: "",
-  pass: "",
-  fromEmail: "admin@siakadponpes.com",
-  fromName: "SIAKAD PONPES",
-  isEnabled: false,
-};
-
 export function getSmtpConfig(): SmtpConfig {
+  const envConfig: SmtpConfig = {
+    host: process.env.SMTP_HOST || DEFAULT_SMTP_CONFIG.host,
+    port: Number(process.env.SMTP_PORT || DEFAULT_SMTP_CONFIG.port),
+    secure: process.env.SMTP_PORT
+      ? Number(process.env.SMTP_PORT) === 465
+      : DEFAULT_SMTP_CONFIG.secure,
+    user: process.env.SMTP_USER || DEFAULT_SMTP_CONFIG.user,
+    pass: process.env.SMTP_PASS || DEFAULT_SMTP_CONFIG.pass,
+    fromEmail: process.env.SMTP_FROM_EMAIL || DEFAULT_SMTP_CONFIG.fromEmail,
+    fromName: process.env.SMTP_FROM_NAME || DEFAULT_SMTP_CONFIG.fromName,
+    isEnabled: Boolean(process.env.SMTP_USER && process.env.SMTP_PASS),
+  };
+
   try {
     const row = sqlite.prepare("SELECT value FROM settings WHERE key = 'smtp'").get() as { value: string } | undefined;
     if (row?.value) {
       const parsed = JSON.parse(row.value);
+      const port = Number(parsed.port || envConfig.port);
+      const secure =
+        port === 465
+          ? true
+          : port === 587 || port === 25
+          ? false
+          : parsed.secure !== undefined
+          ? Boolean(parsed.secure)
+          : envConfig.secure;
+
       return {
-        ...DEFAULT_SMTP_CONFIG,
+        ...envConfig,
         ...parsed,
-        port: Number(parsed.port || 465),
-        secure: parsed.secure !== undefined ? Boolean(parsed.secure) : true,
+        port,
+        secure,
       };
     }
   } catch (err) {
     console.warn("[SMTP] Failed to load config from database:", err);
   }
-  return DEFAULT_SMTP_CONFIG;
+  return envConfig;
 }
 
 export function saveSmtpConfig(config: SmtpConfig): { success: boolean; message: string } {
   try {
+    const port = Number(config.port) || 465;
+    const secure = port === 465 ? true : port === 587 || port === 25 ? false : Boolean(config.secure);
+    const finalConfig: SmtpConfig = {
+      ...config,
+      port,
+      secure,
+    };
+
     sqlite
       .prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('smtp', ?, ?)")
-      .run(JSON.stringify(config), new Date().toISOString());
+      .run(JSON.stringify(finalConfig), new Date().toISOString());
     return { success: true, message: "Pengaturan SMTP berhasil disimpan di database!" };
   } catch (err: any) {
     return { success: false, message: err.message || "Gagal menyimpan pengaturan SMTP" };
@@ -57,16 +91,7 @@ export async function testSmtpConnection(
   targetEmail: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const transporter = nodemailer.createTransport({
-      host: config.host.trim(),
-      port: config.port,
-      secure: config.secure,
-      auth: {
-        user: config.user.trim(),
-        pass: config.pass.trim(),
-      },
-    });
-
+    const transporter = createSmtpTransporter(config);
     await transporter.verify();
 
     if (targetEmail) {
@@ -113,15 +138,7 @@ export async function sendOtpEmail(toEmail: string, otpCode: string): Promise<{ 
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: config.host.trim(),
-      port: config.port,
-      secure: config.secure,
-      auth: {
-        user: config.user.trim(),
-        pass: config.pass.trim(),
-      },
-    });
+    const transporter = createSmtpTransporter(config);
 
     await transporter.sendMail({
       from: `"${config.fromName}" <${config.fromEmail || config.user}>`,
