@@ -179,6 +179,14 @@ function PublicInvoicePage() {
     } catch {}
   }, [inv?.id, inv?.status, inv?.active_payment]);
 
+  const docTitle = inv ? formatInvoiceDocName(inv.invoice_number, inv.profile?.organization) : "";
+
+  useEffect(() => {
+    if (docTitle) {
+      document.title = `${docTitle} — SIAKAD PONPES`;
+    }
+  }, [docTitle]);
+
   if (isLoading && !inv) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -205,13 +213,6 @@ function PublicInvoicePage() {
   const isCancelled = inv.status === "cancelled";
   const isExpired = inv.status === "expired";
   const isUnpaid = inv.status === "unpaid";
-  const docTitle = formatInvoiceDocName(inv.invoice_number, inv.profile?.organization);
-
-  useEffect(() => {
-    if (docTitle) {
-      document.title = `${docTitle} — SIAKAD PONPES`;
-    }
-  }, [docTitle]);
 
   function shareWhatsApp() {
     const url = buildPublicInvoiceUrl(token);

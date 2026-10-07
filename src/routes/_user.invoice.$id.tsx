@@ -147,6 +147,14 @@ function InvoiceView() {
     } catch {}
   }, [inv?.id, inv?.status, inv?.active_payment]);
 
+  const docTitle = inv ? formatInvoiceDocName(inv.invoice_number, inv.profile?.organization) : "";
+
+  useEffect(() => {
+    if (docTitle) {
+      document.title = `${docTitle} — SIAKAD PONPES`;
+    }
+  }, [docTitle]);
+
   if (isLoading) return <p className="text-muted-foreground p-8">Memuat data invoice…</p>;
   if (!inv) return <p className="text-muted-foreground p-8">Invoice tidak ditemukan.</p>;
 
@@ -155,13 +163,6 @@ function InvoiceView() {
   const tax = (subtotal * Number(inv.tax_rate)) / 100;
   const back = auth.role === "admin" ? "/admin/invoices" : "/dashboard";
   const publicShareUrl = buildPublicInvoiceUrl(inv.id);
-  const docTitle = formatInvoiceDocName(inv.invoice_number, inv.profile?.organization);
-
-  useEffect(() => {
-    if (docTitle) {
-      document.title = `${docTitle} — SIAKAD PONPES`;
-    }
-  }, [docTitle]);
 
   function shareWhatsApp() {
     const text =
