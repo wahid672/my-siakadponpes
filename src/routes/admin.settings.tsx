@@ -15,8 +15,10 @@ import {
   ShieldCheck,
   AlertCircle,
   KeyRound,
+  Database,
 } from "lucide-react";
 import { ChangePasswordCard } from "@/components/ChangePasswordCard";
+import { BackupRestoreCard } from "@/components/BackupRestoreCard";
 import { PageHeader } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,15 +147,18 @@ function SettingsPage() {
       />
 
       <Tabs defaultValue="institution" className="space-y-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
-          <TabsTrigger value="institution" className="flex items-center gap-2">
-            <Building className="h-4 w-4" /> Profil Lembaga
+        <TabsList className="grid w-full max-w-2xl grid-cols-2 sm:grid-cols-4">
+          <TabsTrigger value="institution" className="flex items-center gap-1.5 text-xs">
+            <Building className="h-4 w-4 shrink-0" /> Profil Lembaga
           </TabsTrigger>
-          <TabsTrigger value="smtp" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" /> SMTP Email OTP
+          <TabsTrigger value="smtp" className="flex items-center gap-1.5 text-xs">
+            <Mail className="h-4 w-4 shrink-0" /> SMTP Email OTP
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4" /> Ganti Password
+          <TabsTrigger value="security" className="flex items-center gap-1.5 text-xs">
+            <KeyRound className="h-4 w-4 shrink-0" /> Ganti Password
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="flex items-center gap-1.5 text-xs">
+            <Database className="h-4 w-4 shrink-0" /> Backup & Restore
           </TabsTrigger>
         </TabsList>
 
@@ -437,6 +442,11 @@ function SettingsPage() {
         <TabsContent value="security" className="space-y-6">
           <ChangePasswordCard />
         </TabsContent>
+
+        {/* Tab 4: Backup & Restore Basis Data */}
+        <TabsContent value="backup" className="space-y-6">
+          <BackupRestoreCard />
+        </TabsContent>
       </Tabs>
 
       {/* Rekening Pembayaran Manual Section Link */}
@@ -448,7 +458,7 @@ function SettingsPage() {
           <div>
             <h3 className="font-semibold text-sm text-foreground">Rekening Transfer Bank Manual</h3>
             <p className="text-xs text-muted-foreground">
-              Tambah & atur rekening bank resmi pesantren dengan logo bank otomatis terhubung ke sistem.
+              Tambah & atur rekening bank resmi dengan logo bank otomatis terhubung ke sistem.
             </p>
           </div>
         </div>
