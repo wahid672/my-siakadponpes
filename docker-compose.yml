@@ -32,3 +32,10 @@ services:
     volumes:
       # Persistent storage volume for SQLite database (siakad.db)
       - ./data:/app/data
+    networks:
+      - default
+      - caddy_net
+
+networks:
+  caddy_net:
+    external: true
