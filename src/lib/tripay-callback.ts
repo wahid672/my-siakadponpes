@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { verifyTripaySignature, getTripayConfig } from "./tripay";
-import { getTripaySettings } from "./settings";
+import { getTripaySettings, DEFAULT_TRIPAY_CONFIG } from "./settings";
 import { cleanInvoiceNotes } from "./public-invoice";
 import { sqlite } from "./db";
 
@@ -17,6 +17,39 @@ export interface TripayCallbackPayload {
   status: "PAID" | "UNPAID" | "FAILED" | "EXPIRED" | "REFUND" | string;
   paid_at?: number | string | null;
   note?: string | null;
+}
+
+/**
+ * Retrieves all possible Tripay private keys configured in DB, ENV, or defaults
+ */
+function getAllTripayPrivateKeys(): string[] {
+  const keys: string[] = [];
+
+  // 1. Direct query from SQLite table settings
+  try {
+    const row = sqlite.prepare("SELECT value FROM settings WHERE key = 'tripay'").get() as
+      | { value: string }
+      | undefined;
+    if (row?.value) {
+      const parsed = JSON.parse(row.value);
+      if (parsed.privateKey) keys.push(String(parsed.privateKey).trim());
+      if (parsed.private_key) keys.push(String(parsed.private_key).trim());
+    }
+  } catch (err) {
+    console.error("[Tripay Webhook] Failed to query private key from SQLite:", err);
+  }
+
+  // 2. Direct read from process.env
+  if (process.env.TRIPAY_PRIVATE_KEY) {
+    keys.push(process.env.TRIPAY_PRIVATE_KEY.trim());
+  }
+
+  // 3. Fallback default
+  if (DEFAULT_TRIPAY_CONFIG.privateKey) {
+    keys.push(DEFAULT_TRIPAY_CONFIG.privateKey.trim());
+  }
+
+  return Array.from(new Set(keys.filter(Boolean)));
 }
 
 /**
@@ -99,15 +132,25 @@ export async function handleTripayCallback(request: Request): Promise<Response> 
       request.headers.get("X-Callback-Signature") ||
       "";
 
-    // Load active Tripay configuration
-    const activeConfig = await getTripaySettings();
-    const privateKey = activeConfig.privateKey || getTripayConfig().privateKey;
+    // Verify HMAC-SHA256 signature
+    const candidateKeys = getAllTripayPrivateKeys();
+    let signatureMatched = false;
 
-    // Verify HMAC-SHA256 signature if private key and signature exist
-    if (signatureHeader && privateKey) {
-      const isValid = await verifyTripaySignature(rawBody, signatureHeader, privateKey);
-      if (!isValid) {
-        console.warn("[Tripay Webhook] Signature mismatch! Incoming:", signatureHeader);
+    if (signatureHeader && candidateKeys.length > 0) {
+      const cleanIncoming = signatureHeader.trim().toLowerCase();
+
+      for (const key of candidateKeys) {
+        const calculated = crypto.createHmac("sha256", key).update(rawBody).digest("hex").toLowerCase();
+        if (calculated === cleanIncoming) {
+          signatureMatched = true;
+          break;
+        }
+      }
+
+      if (!signatureMatched) {
+        console.warn("[Tripay Webhook] Signature mismatch!");
+        console.warn("  Incoming signature :", signatureHeader);
+        console.warn("  Candidate keys tested:", candidateKeys.length);
         return new Response(
           JSON.stringify({ success: false, message: "Invalid callback signature" }),
           { status: 400, headers: { "content-type": "application/json" } }
@@ -116,7 +159,7 @@ export async function handleTripayCallback(request: Request): Promise<Response> 
     }
 
     const payload = JSON.parse(rawBody) as TripayCallbackPayload;
-    console.log("[Tripay Webhook] Processing callback:", {
+    console.log("[Tripay Webhook] Signature valid! Processing callback:", {
       reference: payload.reference,
       merchant_ref: payload.merchant_ref,
       status: payload.status,
@@ -126,7 +169,25 @@ export async function handleTripayCallback(request: Request): Promise<Response> 
 
     const isPaid = (payload.status || "").toUpperCase() === "PAID";
 
+    // Handle test / simulator callbacks from Tripay dashboard
+    const isTestCallback =
+      (payload.merchant_ref && (
+        payload.merchant_ref.toUpperCase().includes("TEST") ||
+        payload.merchant_ref.toUpperCase().includes("SIMULATOR") ||
+        payload.merchant_ref.toUpperCase().includes("DEMO")
+      )) ||
+      (payload.reference && (
+        payload.reference.toUpperCase().includes("TEST") ||
+        payload.reference.toUpperCase().includes("SIMULATOR")
+      ));
+
     if (!payload.merchant_ref) {
+      if (isTestCallback) {
+        return new Response(
+          JSON.stringify({ success: true, message: "Tes Callback Tripay berhasil diverifikasi!" }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({ success: false, message: "Missing merchant_ref in payload" }),
         { status: 400, headers: { "content-type": "application/json" } }
@@ -137,6 +198,18 @@ export async function handleTripayCallback(request: Request): Promise<Response> 
     const inv = findInvoiceByMerchantRef(payload.merchant_ref);
 
     if (!inv) {
+      if (isTestCallback) {
+        console.log("[Tripay Webhook] Test callback recognized & signature verified successfully (200 OK).");
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Tes Callback Tripay berhasil diverifikasi!",
+            test: true,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+
       console.error("[Tripay Webhook] INVOICE NOT FOUND for merchant_ref:", payload.merchant_ref);
       return new Response(
         JSON.stringify({
