@@ -120,13 +120,13 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
         ribbonRgb = [5, 150, 105]; // Emerald 600
       } else if (rawStatus === "pending") {
         statusText = "PENDING";
-        ribbonRgb = [217, 119, 6]; // Amber 600
+        ribbonRgb = [245, 158, 11]; // Amber 500 (100% matches web bg-amber-500)
       } else if (rawStatus === "cancelled") {
         statusText = "DIBATALKAN";
         ribbonRgb = [82, 82, 91]; // Zinc 600
       } else if (rawStatus === "expired") {
         statusText = "KEDALUWARSA";
-        ribbonRgb = [234, 88, 12]; // Orange 600
+        ribbonRgb = [82, 82, 91]; // Zinc 600
       } else {
         statusText = "UNPAID";
         ribbonRgb = [225, 29, 72]; // Rose 600
@@ -141,13 +141,13 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
           ribbonRgb = [5, 150, 105];
         } else if (domTxt.includes("PENDING") || domTxt.includes("MENUNGGU")) {
           statusText = "PENDING";
-          ribbonRgb = [217, 119, 6];
+          ribbonRgb = [245, 158, 11];
         } else if (domTxt.includes("CANCEL") || domTxt.includes("BATAL")) {
           statusText = "DIBATALKAN";
           ribbonRgb = [82, 82, 91];
         } else if (domTxt.includes("EXPIR") || domTxt.includes("KEDALUWARSA")) {
           statusText = "KEDALUWARSA";
-          ribbonRgb = [234, 88, 12];
+          ribbonRgb = [82, 82, 91];
         } else if (domTxt.includes("UNPAID") || domTxt.includes("BELUM")) {
           statusText = "UNPAID";
           ribbonRgb = [225, 29, 72];
@@ -454,9 +454,8 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
 }
 
 /**
- * Draws a pristine, razor-sharp 45-degree vector status ribbon across the top-right corner
- * of the A4 PDF page. Using native jsPDF vector primitives guarantees 100% reliability,
- * exact 45° angle, and zero reliance on browser/html2canvas CSS transform bugs.
+ * Draws a pristine, sleek 45-degree status ribbon across the top-right corner
+ * of the A4 PDF page, exactly matching the web application design (Image 1).
  */
 function drawPdfCornerRibbon(
   pdf: jsPDF,
@@ -466,47 +465,55 @@ function drawPdfCornerRibbon(
   const [r, g, b] = rgb;
   const pageWidth = 210; // A4 width in mm
 
-  // Outer diagonal: (pageWidth - 44, 0) to (pageWidth, 44) => angle 45 deg
-  // Inner diagonal: (pageWidth - 32, 0) to (pageWidth, 32) => angle 45 deg
-  // Perpendicular thickness = (44 - 32) * cos(45 deg) = 12 * 0.7071 ≈ 8.5 mm
-  const dOuter = 44;
-  const dInner = 32;
+  // Precise geometry to match the sleek web ribbon:
+  // Inner edge cuts top and right edges at 26mm from the corner
+  // Outer edge cuts top and right edges at 17.5mm from the corner
+  // Perpendicular thickness = (26 - 17.5) * cos(45°) ≈ 6.0 mm (matching 24px web height)
+  const dInner = 26;
+  const dOuter = 17.5;
 
-  const p1x = pageWidth - dOuter; // 166
+  const p1x = pageWidth - dInner; // 184.0 mm
   const p1y = 0;
-  const p2x = pageWidth - dInner; // 178
+  const p2x = pageWidth - dOuter; // 192.5 mm
   const p2y = 0;
-  const p3x = pageWidth;          // 210
-  const p3y = dInner;             // 32
-  const p4x = pageWidth;          // 210
-  const p4y = dOuter;             // 44
+  const p3x = pageWidth;          // 210.0 mm
+  const p3y = dOuter;             // 17.5 mm
+  const p4x = pageWidth;          // 210.0 mm
+  const p4y = dInner;             // 26.0 mm
 
-  // 1. Draw ribbon background with two triangles forming the quadrilateral
+  // 1. Draw solid ribbon background (two triangles forming the diagonal band)
   pdf.setFillColor(r, g, b);
   pdf.triangle(p1x, p1y, p2x, p2y, p3x, p3y, "F");
   pdf.triangle(p1x, p1y, p3x, p3y, p4x, p4y, "F");
 
-  // 2. Draw subtle border highlight lines for realistic ribbon finish
-  pdf.setDrawColor(Math.max(0, r - 30), Math.max(0, g - 30), Math.max(0, b - 30));
-  pdf.setLineWidth(0.3);
-  pdf.line(p1x, p1y, p4x, p4y); // Outer edge
-  pdf.line(p2x, p2y, p3x, p3y); // Inner edge
+  // 2. Draw sharp, centered uppercase status text with character spacing
+  const dMid = (dInner + dOuter) / 2; // 21.75 mm
+  const midX = pageWidth - dMid / 2;   // 199.125 mm
+  const midY = dMid / 2;               // 10.875 mm
 
-  // 3. Draw Rotated Text
-  // Center: ((166 + 178) / 2 + 210) / 2 = 191 mm, (0 + 38) / 2 = 19 mm
-  const centerX = (p1x + p2x + p3x + p4x) / 4; // 191 mm
-  const centerY = (p1y + p2y + p3y + p4y) / 4; // 19 mm
+  // Fine-tuned typographic baseline offset to achieve optical vertical centering
+  const textX = midX - 0.45;
+  const textY = midY + 0.45;
 
   pdf.setTextColor(255, 255, 255);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(8);
+  pdf.setFontSize(7.2);
+
+  if (typeof (pdf as any).setCharSpace === "function") {
+    (pdf as any).setCharSpace(0.35); // Matches Tailwind tracking-widest
+  }
 
   // angle: -45 rotates clockwise (sloping down-right, exactly matching the 45-degree ribbon)
-  pdf.text(text.toUpperCase(), centerX, centerY, {
+  pdf.text(text.toUpperCase(), textX, textY, {
     angle: -45,
     align: "center",
-    baseline: "middle",
   });
+
+  // Reset character spacing after drawing ribbon text
+  if (typeof (pdf as any).setCharSpace === "function") {
+    (pdf as any).setCharSpace(0);
+  }
 }
+
 
 
