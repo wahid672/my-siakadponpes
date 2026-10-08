@@ -163,6 +163,11 @@ function InvoiceView() {
   const tax = (subtotal * Number(inv.tax_rate)) / 100;
   const back = auth.role === "admin" ? "/admin/invoices" : "/dashboard";
   const publicShareUrl = buildPublicInvoiceUrl(inv.id);
+  const isPaid = inv.status === "paid";
+  const isCancelled = inv.status === "cancelled";
+  const isExpired = inv.status === "expired";
+  const isPending = inv.status === "pending";
+  const isUnpaid = inv.status === "unpaid";
 
   function shareWhatsApp() {
     const text =
@@ -457,17 +462,19 @@ function InvoiceView() {
 
       {/* Printable Invoice Paper Document */}
       <article id="printable-invoice-paper" className="relative overflow-hidden rounded-2xl border bg-card p-5 sm:p-7 md:p-10 shadow-xs print:shadow-none print:border-none">
-        {/* Ribbon Status */}
+        {/* Ribbon Status (Layar Web Only) */}
         <div
-          className={`absolute right-[-3rem] top-6 rotate-45 px-14 py-1 text-[11px] font-bold uppercase tracking-widest text-center shadow-xs ${
-            inv.status === "paid"
+          className={`no-print absolute right-[-3rem] top-6 rotate-45 px-14 py-1 text-[11px] font-bold uppercase tracking-widest text-center shadow-xs ${
+            isPaid
               ? "bg-emerald-600 text-white"
-              : inv.status === "cancelled"
-              ? "bg-rose-600 text-white"
-              : "bg-amber-500 text-white"
+              : isPending
+              ? "bg-amber-500 text-white"
+              : isCancelled || isExpired
+              ? "bg-zinc-600 text-white"
+              : "bg-rose-600 text-white"
           }`}
         >
-          {inv.status.toUpperCase()}
+          {isPaid ? "PAID" : isPending ? "PENDING" : isUnpaid ? "UNPAID" : inv.status.toUpperCase()}
         </div>
 
         {/* Header */}
@@ -484,12 +491,37 @@ function InvoiceView() {
           </div>
 
           {/* Invoice Meta & Dates */}
-          <div className="flex flex-col sm:items-end text-left sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50">
+          <div className="flex flex-col sm:items-end text-left sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50 pr-0 sm:pr-14">
             <div className="flex flex-col sm:items-end">
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground uppercase leading-none">INVOICE</h1>
               <p className="font-mono text-xs sm:text-sm text-muted-foreground font-semibold mt-1">#{inv.invoice_number}</p>
+              <div className="invoice-status-badge mt-2 mb-1">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider border ${
+                    isPaid
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/20"
+                      : isCancelled
+                      ? "bg-rose-500/15 text-rose-600 border-rose-500/20"
+                      : isExpired
+                      ? "bg-rose-500/15 text-rose-600 border-rose-500/20"
+                      : isPending
+                      ? "bg-amber-500/15 text-amber-600 border-amber-500/20"
+                      : "bg-rose-500/15 text-rose-600 border-rose-500/20"
+                  }`}
+                >
+                  {isPaid
+                    ? "Lunas (PAID)"
+                    : isCancelled
+                    ? "Dibatalkan (CANCELLED)"
+                    : isExpired
+                    ? "Kedaluwarsa (EXPIRED)"
+                    : isPending
+                    ? "Pending (MENUNGGU PEMBAYARAN)"
+                    : "Belum Bayar (UNPAID)"}
+                </span>
+              </div>
             </div>
-            <div className="mt-2.5 space-y-0.5 text-xs text-muted-foreground">
+            <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
               <p>
                 <span>Tanggal Terbit: </span>
                 <span className="font-medium text-foreground">{tanggal(inv.issue_date)}</span>
