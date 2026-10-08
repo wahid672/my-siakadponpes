@@ -4,8 +4,11 @@ import {
   createTripaySignature,
   TripayCreateTransactionParams,
   TripayTransactionResponse,
+  DEFAULT_TRIPAY_CHANNELS,
 } from "./tripay";
 import { getTripaySettings } from "./settings";
+import { PaymentChannelItem } from "./domain-types";
+import { sqlite } from "./db";
 
 export interface TestTripayResult {
   success: boolean;
@@ -38,6 +41,38 @@ export const testTripayConnectionServerFn = createServerFn({ method: "POST" })
           name: c.name,
           group: c.group,
         }));
+
+        // Persist full channels to SQLite settings
+        try {
+          const fullChannels: PaymentChannelItem[] = (json.data || []).map((c: any) => ({
+            code: String(c.code),
+            name: String(c.name),
+            group: (c.group as any) || "Virtual Account",
+            type: String(c.type || "direct"),
+            fee_merchant: {
+              flat: Number(c.fee_merchant?.flat || 0),
+              percent: Number(c.fee_merchant?.percent || 0),
+            },
+            fee_customer: {
+              flat: Number(c.fee_customer?.flat || 0),
+              percent: Number(c.fee_customer?.percent || 0),
+            },
+            total_fee: {
+              flat: Number(c.total_fee?.flat || 0),
+              percent: Number(c.total_fee?.percent || 0),
+            },
+            minimum_fee: c.minimum_fee !== undefined ? Number(c.minimum_fee) : undefined,
+            maximum_fee: c.maximum_fee !== undefined ? Number(c.maximum_fee) : undefined,
+            icon_url: c.icon_url || undefined,
+            active: c.active !== false,
+          }));
+          sqlite
+            .prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('tripay_channels', ?, ?)")
+            .run(JSON.stringify(fullChannels), new Date().toISOString());
+        } catch (dbErr) {
+          console.warn("[Tripay] Failed to cache channels on test connection:", dbErr);
+        }
+
         return {
           success: true,
           message: `Berhasil terhubung ke Tripay ${mode.toUpperCase()}! Terdeteksi ${channels.length} saluran pembayaran aktif.`,
@@ -180,4 +215,121 @@ export const createTripayTransactionServerFn = createServerFn({ method: "POST" }
         message: err.message || "Koneksi server ke gateway Tripay gagal",
       };
     }
+  });
+
+/**
+ * Server function to fetch active payment channels directly from Tripay API,
+ * cached in SQLite settings ('tripay_channels').
+ */
+export const getTripayChannelsServerFn = createServerFn({ method: "POST" })
+  .validator((params?: { forceRefresh?: boolean }) => params || {})
+  .handler(async ({ data } = { data: {} }): Promise<{
+    success: boolean;
+    channels: PaymentChannelItem[];
+    source: "tripay_api" | "database" | "default";
+    message?: string;
+  }> => {
+    const forceRefresh = Boolean(data?.forceRefresh);
+    const dbConfig = await getTripaySettings();
+
+    // 1. If not forceRefresh, try SQLite cache first
+    if (!forceRefresh) {
+      try {
+        const cachedRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'tripay_channels'").get() as any;
+        if (cachedRow?.value) {
+          const parsed = JSON.parse(cachedRow.value);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return {
+              success: true,
+              channels: parsed,
+              source: "database",
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("[Tripay] Error reading cached channels:", err);
+      }
+    }
+
+    // 2. Fetch fresh from Tripay API if API key is configured
+    if (dbConfig.apiKey && dbConfig.apiKey.trim()) {
+      try {
+        const baseUrl = getTripayBaseUrl(dbConfig.mode);
+        const res = await fetch(`${baseUrl}/merchant/payment-channel`, {
+          headers: {
+            Authorization: `Bearer ${dbConfig.apiKey.trim()}`,
+          },
+        });
+        const json = await res.json().catch(() => null);
+
+        if (res.ok && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const fetchedChannels: PaymentChannelItem[] = json.data.map((c: any) => ({
+            code: String(c.code),
+            name: String(c.name),
+            group: (c.group as any) || "Virtual Account",
+            type: String(c.type || "direct"),
+            fee_merchant: {
+              flat: Number(c.fee_merchant?.flat || 0),
+              percent: Number(c.fee_merchant?.percent || 0),
+            },
+            fee_customer: {
+              flat: Number(c.fee_customer?.flat || 0),
+              percent: Number(c.fee_customer?.percent || 0),
+            },
+            total_fee: {
+              flat: Number(c.total_fee?.flat || 0),
+              percent: Number(c.total_fee?.percent || 0),
+            },
+            minimum_fee: c.minimum_fee !== undefined ? Number(c.minimum_fee) : undefined,
+            maximum_fee: c.maximum_fee !== undefined ? Number(c.maximum_fee) : undefined,
+            icon_url: c.icon_url || undefined,
+            active: c.active !== false,
+          }));
+
+          // Persist to SQLite
+          try {
+            sqlite
+              .prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('tripay_channels', ?, ?)")
+              .run(JSON.stringify(fetchedChannels), new Date().toISOString());
+          } catch (dbErr) {
+            console.warn("[Tripay] Failed to write tripay_channels to DB:", dbErr);
+          }
+
+          const activeCount = fetchedChannels.filter((c) => c.active).length;
+          return {
+            success: true,
+            channels: fetchedChannels,
+            source: "tripay_api",
+            message: `Berhasil memuat ${activeCount} saluran pembayaran aktif dari akun Tripay (${dbConfig.mode.toUpperCase()}).`,
+          };
+        } else if (json?.message) {
+          console.warn("[Tripay] API responded with error:", json.message);
+        }
+      } catch (apiErr: any) {
+        console.warn("[Tripay] Error connecting to Tripay API:", apiErr.message);
+      }
+    }
+
+    // 3. Fallback: try cached from DB
+    try {
+      const cachedRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'tripay_channels'").get() as any;
+      if (cachedRow?.value) {
+        const parsed = JSON.parse(cachedRow.value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return {
+            success: true,
+            channels: parsed,
+            source: "database",
+          };
+        }
+      }
+    } catch {}
+
+    // 4. Fallback to DEFAULT_TRIPAY_CHANNELS
+    return {
+      success: true,
+      channels: DEFAULT_TRIPAY_CHANNELS,
+      source: "default",
+      message: "Menggunakan saluran pembayaran standar.",
+    };
   });

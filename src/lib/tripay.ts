@@ -124,6 +124,49 @@ export const DEFAULT_TRIPAY_CHANNELS: PaymentChannelItem[] = [
   },
 ];
 
+export const STORAGE_TRIPAY_CHANNELS_KEY = "siakad_tripay_channels";
+
+export function getCachedTripayChannels(): PaymentChannelItem[] {
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem(STORAGE_TRIPAY_CHANNELS_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return DEFAULT_TRIPAY_CHANNELS;
+}
+
+export async function fetchTripayChannels(forceRefresh = false): Promise<{
+  success: boolean;
+  channels: PaymentChannelItem[];
+  source: "tripay_api" | "database" | "default";
+  message?: string;
+}> {
+  try {
+    const { getTripayChannelsServerFn } = await import("./tripay-server");
+    const res = await getTripayChannelsServerFn({ data: { forceRefresh } });
+    if (res.success && Array.isArray(res.channels)) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_TRIPAY_CHANNELS_KEY, JSON.stringify(res.channels));
+        window.dispatchEvent(
+          new CustomEvent("tripay_channels_updated", { detail: res.channels })
+        );
+      }
+      return res;
+    }
+  } catch (err: any) {
+    console.warn("[Tripay] fetchTripayChannels error:", err);
+  }
+  return {
+    success: true,
+    channels: getCachedTripayChannels(),
+    source: "default",
+  };
+}
+
 import { getTripaySettings, DEFAULT_TRIPAY_CONFIG } from "./settings";
 
 export function getTripayBaseUrl(mode: "sandbox" | "production" = "sandbox") {

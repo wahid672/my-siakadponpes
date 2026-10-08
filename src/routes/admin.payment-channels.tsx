@@ -1,12 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Layers, CheckCircle2, XCircle, ShieldCheck, Zap, Building2, AlertTriangle, ArrowRight } from "lucide-react";
+import { Layers, CheckCircle2, XCircle, ShieldCheck, Zap, Building2, AlertTriangle, ArrowRight, RefreshCw, Check } from "lucide-react";
 import { PageHeader } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { DEFAULT_TRIPAY_CHANNELS } from "@/lib/tripay";
+import { DEFAULT_TRIPAY_CHANNELS, fetchTripayChannels, getCachedTripayChannels } from "@/lib/tripay";
 import { PaymentChannelItem } from "@/lib/domain-types";
 import { rupiah } from "@/lib/auth";
 import { ManualBankSettings } from "@/components/ManualBankSettings";
@@ -25,33 +24,57 @@ export const Route = createFileRoute("/admin/payment-channels")({
 });
 
 function PaymentChannels() {
-  const [channels, setChannels] = useState<PaymentChannelItem[]>(DEFAULT_TRIPAY_CHANNELS);
+  const [channels, setChannels] = useState<PaymentChannelItem[]>(() => getCachedTripayChannels());
   const [tripayConfig, setTripayConfig] = useState(() => getCachedTripaySettings());
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     getTripaySettings().then((cfg) => {
       if (mounted) setTripayConfig(cfg);
     });
+
+    fetchTripayChannels(false).then((res) => {
+      if (mounted && res?.channels && res.channels.length > 0) {
+        setChannels(res.channels);
+      }
+    });
+
     const handleUpdate = (e: any) => {
       if (e?.detail) setTripayConfig(e.detail);
     };
+    const handleChannelsUpdate = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setChannels(e.detail);
+      }
+    };
+
     window.addEventListener("tripay_settings_updated", handleUpdate);
+    window.addEventListener("tripay_channels_updated", handleChannelsUpdate);
+
     return () => {
       mounted = false;
       window.removeEventListener("tripay_settings_updated", handleUpdate);
+      window.removeEventListener("tripay_channels_updated", handleChannelsUpdate);
     };
   }, []);
 
-  function toggleChannel(code: string) {
-    setChannels((prev) =>
-      prev.map((c) => {
-        if (c.code !== code) return c;
-        const nextState = !c.active;
-        toast.info(`Saluran ${c.name} ${nextState ? "diaktifkan" : "dinonaktifkan"}`);
-        return { ...c, active: nextState };
-      })
-    );
+  async function handleSyncTripay() {
+    setIsSyncing(true);
+    try {
+      const res = await fetchTripayChannels(true);
+      if (res?.channels) {
+        setChannels(res.channels);
+        const activeCount = res.channels.filter((c) => c.active !== false).length;
+        toast.success(res.message || `Berhasil menyinkronkan ${activeCount} saluran pembayaran dari Tripay!`);
+      } else {
+        toast.error("Gagal menyinkronkan saluran pembayaran dari Tripay");
+      }
+    } catch (err: any) {
+      toast.error("Gagal menghubungi Tripay: " + (err?.message || "Terjadi kesalahan"));
+    } finally {
+      setIsSyncing(false);
+    }
   }
 
   const groups = Array.from(new Set(channels.map((c) => c.group)));
@@ -118,47 +141,93 @@ function PaymentChannels() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toast.success("Daftar saluran pembayaran telah diperbarui dari Tripay")}
-              className="shrink-0"
+              onClick={handleSyncTripay}
+              disabled={isSyncing}
+              className="shrink-0 font-medium"
             >
-              <Zap className="mr-2 h-4 w-4" /> Sinkronisasi Tripay
+              <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+              {isSyncing ? "Menyinkronkan..." : "Sinkronisasi Tripay"}
             </Button>
           </div>
 
-      <div className="space-y-6">
-        {groups.map((group) => {
-          const groupItems = channels.filter((c) => c.group === group);
-          return (
-            <div key={group} className="space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{group}</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {groupItems.map((c) => (
-                  <div
-                    key={c.code}
-                    className="flex flex-col justify-between rounded-xl border bg-card p-4 shadow-xs transition hover:border-primary/40"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm text-foreground">{c.name}</span>
-                        <Switch checked={c.active} onCheckedChange={() => toggleChannel(c.code)} />
-                      </div>
-                      <p className="font-mono text-xs text-muted-foreground uppercase">{c.code}</p>
-                    </div>
-
-                    <div className="mt-4 border-t pt-3 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Estimasi Biaya:</span>
-                      <span className="font-medium text-foreground">
-                        {c.fee_merchant.flat > 0 ? rupiah(c.fee_merchant.flat) : ""}
-                        {c.fee_merchant.percent > 0 ? ` + ${c.fee_merchant.percent}%` : ""}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Informative Banner */}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-3">
+            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+            <div className="space-y-0.5">
+              <p className="font-semibold">Sinkronisasi Otomatis dari Dashboard Tripay</p>
+              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                Saluran pembayaran di bawah ini disinkronkan langsung dari akun Tripay Anda. Setiap saluran yang Anda aktifkan di dashboard merchant Tripay akan otomatis tersedia untuk klien tanpa perlu pengaturan manual lagi di sini.
+              </p>
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          <div className="space-y-6">
+            {groups.map((group) => {
+              const groupItems = channels.filter((c) => c.group === group);
+              return (
+                <div key={group} className="space-y-3">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{group}</h2>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {groupItems.map((c) => (
+                      <div
+                        key={c.code}
+                        className={`flex flex-col justify-between rounded-xl border bg-card p-4 shadow-xs transition hover:border-primary/40 ${
+                          !c.active ? "opacity-60 bg-muted/20" : ""
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              {c.icon_url ? (
+                                <div className="flex h-9 w-12 items-center justify-center rounded-lg border bg-white p-1 shrink-0 shadow-2xs">
+                                  <img
+                                    src={c.icon_url}
+                                    alt={c.name}
+                                    className="max-h-full max-w-full object-contain"
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                                  <Zap className="h-4 w-4" />
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-semibold text-xs sm:text-sm text-foreground line-clamp-1">{c.name}</span>
+                                <p className="font-mono text-[11px] text-muted-foreground uppercase">{c.code}</p>
+                              </div>
+                            </div>
+
+                            {/* Badge Status Aktif di Tripay */}
+                            {c.active ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                                <CheckCircle2 className="h-3 w-3" /> Aktif
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground border shrink-0">
+                                <XCircle className="h-3 w-3" /> Nonaktif
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 border-t pt-3 flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Estimasi Biaya:</span>
+                          <span className="font-medium text-foreground">
+                            {c.fee_merchant.flat > 0 ? rupiah(c.fee_merchant.flat) : ""}
+                            {c.fee_merchant.percent > 0 ? ` + ${c.fee_merchant.percent}%` : ""}
+                            {c.fee_merchant.flat === 0 && c.fee_merchant.percent === 0 ? "Gratis Merchant" : ""}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

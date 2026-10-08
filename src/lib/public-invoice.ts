@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import crypto from "crypto";
 import { DEFAULT_GENERAL_SETTINGS, GeneralSettings, DEFAULT_TRIPAY_CONFIG } from "./settings";
 import { DEFAULT_MANUAL_BANKS, ManualBankAccount } from "./manual-banks";
+import { DEFAULT_TRIPAY_CHANNELS } from "./tripay";
+import { PaymentChannelItem } from "./domain-types";
 import { sqlite } from "./db";
 
 export interface PublicInvoiceResult {
@@ -11,6 +13,7 @@ export interface PublicInvoiceResult {
   manualBanks?: ManualBankAccount[];
   isTripayEnabled?: boolean;
   isManualTransferEnabled?: boolean;
+  tripayChannels?: PaymentChannelItem[];
   error?: string;
 }
 
@@ -101,7 +104,19 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
         } catch {}
       }
 
-      // 5. Query invoice by ID or invoice_number
+      // 5. Fetch active Tripay channels (synchronized from Tripay API / DB)
+      let tripayChannels: PaymentChannelItem[] = DEFAULT_TRIPAY_CHANNELS.filter((c) => c.active !== false);
+      try {
+        const channelsRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'tripay_channels'").get() as any;
+        if (channelsRow?.value) {
+          const parsedChannels = JSON.parse(channelsRow.value);
+          if (Array.isArray(parsedChannels) && parsedChannels.length > 0) {
+            tripayChannels = parsedChannels.filter((c: any) => c.active !== false);
+          }
+        }
+      } catch {}
+
+      // 6. Query invoice by ID or invoice_number
       const inv = sqlite
         .prepare("SELECT * FROM invoices WHERE id = ? OR invoice_number = ?")
         .get(id, id) as any;
@@ -136,6 +151,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
           manualBanks,
           isTripayEnabled,
           isManualTransferEnabled,
+          tripayChannels,
         };
       }
     } catch (err) {
@@ -149,6 +165,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
       manualBanks,
       isTripayEnabled: DEFAULT_TRIPAY_CONFIG.isEnabled,
       isManualTransferEnabled: true,
+      tripayChannels: DEFAULT_TRIPAY_CHANNELS.filter((c) => c.active !== false),
       error: "Invoice tidak ditemukan",
     };
   });

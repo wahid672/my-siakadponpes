@@ -24,7 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { DEFAULT_TRIPAY_CHANNELS, createTripayTransaction } from "@/lib/tripay";
+import { DEFAULT_TRIPAY_CHANNELS, createTripayTransaction, fetchTripayChannels, getCachedTripayChannels } from "@/lib/tripay";
+import { PaymentChannelItem } from "@/lib/domain-types";
 import {
   getPublicInvoiceServerFn,
   completePublicPaymentServerFn,
@@ -73,9 +74,17 @@ export const Route = createFileRoute("/i/$token")({
         manualBanks: res?.manualBanks ?? null,
         isTripayEnabled: res?.isTripayEnabled ?? true,
         isManualTransferEnabled: res?.isManualTransferEnabled ?? true,
+        tripayChannels: res?.tripayChannels ?? null,
       };
     } catch {
-      return { invoice: null, settings: null, manualBanks: null, isTripayEnabled: true, isManualTransferEnabled: true };
+      return {
+        invoice: null,
+        settings: null,
+        manualBanks: null,
+        isTripayEnabled: true,
+        isManualTransferEnabled: true,
+        tripayChannels: null,
+      };
     }
   },
   component: PublicInvoicePage,
@@ -91,10 +100,12 @@ function PublicInvoicePage() {
     manualBanks: ManualBankAccount[] | null;
     isTripayEnabled?: boolean;
     isManualTransferEnabled?: boolean;
+    tripayChannels?: PaymentChannelItem[] | null;
   } | null;
   const initialInvoice = loaderData?.invoice ?? null;
   const initialSettings = loaderData?.settings ?? null;
   const initialManualBanks = loaderData?.manualBanks ?? null;
+  const initialTripayChannels = loaderData?.tripayChannels ?? null;
   const qc = useQueryClient();
 
   const [payModalOpen, setPayModalOpen] = useState(false);
@@ -109,6 +120,10 @@ function PublicInvoicePage() {
   const [isManualTransferEnabled, setIsManualTransferEnabled] = useState<boolean>(() => {
     if (loaderData?.isManualTransferEnabled !== undefined) return loaderData.isManualTransferEnabled;
     return getCachedManualTransferEnabled();
+  });
+  const [tripayChannels, setTripayChannels] = useState<PaymentChannelItem[]>(() => {
+    if (initialTripayChannels && initialTripayChannels.length > 0) return initialTripayChannels;
+    return getCachedTripayChannels();
   });
   const [paymentTab, setPaymentTab] = useState<string>(() => {
     const initManual = loaderData?.isManualTransferEnabled !== undefined ? loaderData.isManualTransferEnabled : getCachedManualTransferEnabled();
@@ -145,6 +160,11 @@ function PublicInvoicePage() {
     getManualTransferEnabled().then((en) => {
       if (mounted) setIsManualTransferEnabled(en);
     });
+    fetchTripayChannels(false).then((res) => {
+      if (mounted && res?.channels && res.channels.length > 0) {
+        setTripayChannels(res.channels);
+      }
+    });
 
     const handleUpdate = (e: any) => {
       if (e?.detail) setGeneralSettings(e.detail);
@@ -162,10 +182,17 @@ function PublicInvoicePage() {
         setIsManualTransferEnabled(e.detail.isEnabled);
       }
     };
+    const handleChannelsUpdate = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setTripayChannels(e.detail);
+      }
+    };
+
     window.addEventListener("general_settings_updated", handleUpdate);
     window.addEventListener("manual_banks_updated", handleBanksUpdate);
     window.addEventListener("tripay_settings_updated", handleTripayUpdate);
     window.addEventListener("manual_transfer_enabled_updated", handleManualToggleUpdate);
+    window.addEventListener("tripay_channels_updated", handleChannelsUpdate);
 
     return () => {
       mounted = false;
@@ -173,6 +200,7 @@ function PublicInvoicePage() {
       window.removeEventListener("manual_banks_updated", handleBanksUpdate);
       window.removeEventListener("tripay_settings_updated", handleTripayUpdate);
       window.removeEventListener("manual_transfer_enabled_updated", handleManualToggleUpdate);
+      window.removeEventListener("tripay_channels_updated", handleChannelsUpdate);
     };
   }, []);
 
@@ -187,6 +215,7 @@ function PublicInvoicePage() {
           if (res.manualBanks) setManualBanks(res.manualBanks);
           if (res.isTripayEnabled !== undefined) setIsTripayEnabled(res.isTripayEnabled);
           if (res.isManualTransferEnabled !== undefined) setIsManualTransferEnabled(res.isManualTransferEnabled);
+          if (res.tripayChannels) setTripayChannels(res.tripayChannels);
           return res.invoice;
         }
       } catch (err) {
@@ -267,6 +296,7 @@ function PublicInvoicePage() {
   const isExpired = inv.status === "expired";
   const isPending = inv.status === "pending";
   const isUnpaid = inv.status === "unpaid";
+  const activeTripayChannels = tripayChannels.filter((c) => c.active !== false);
 
   function shareWhatsApp() {
     const url = buildPublicInvoiceUrl(token);
@@ -306,7 +336,7 @@ function PublicInvoicePage() {
 
     // Standardized merchantRef using clear separator '__'
     const merchantRef = `${inv.invoice_number}__${Date.now()}`;
-    const selectedChObj = DEFAULT_TRIPAY_CHANNELS.find((c) => c.code === selectedChannel);
+    const selectedChObj = tripayChannels.find((c) => c.code === selectedChannel) || DEFAULT_TRIPAY_CHANNELS.find((c) => c.code === selectedChannel);
 
     // Send request to Tripay API via server function
     const res = await createTripayTransaction({
@@ -829,7 +859,7 @@ function PublicInvoicePage() {
                   </p>
 
                   <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {DEFAULT_TRIPAY_CHANNELS.map((ch) => (
+                    {activeTripayChannels.map((ch) => (
                       <button
                         key={ch.code}
                         type="button"
@@ -852,6 +882,12 @@ function PublicInvoicePage() {
                         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       </button>
                     ))}
+
+                    {activeTripayChannels.length === 0 && (
+                      <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+                        Belum ada saluran pembayaran aktif di akun Tripay. Silakan hubungi pengelola atau aktifkan saluran di dashboard Tripay.
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t pt-3 flex justify-end gap-2">
@@ -969,7 +1005,7 @@ function PublicInvoicePage() {
                 </p>
 
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {DEFAULT_TRIPAY_CHANNELS.map((ch) => (
+                  {activeTripayChannels.map((ch) => (
                     <button
                       key={ch.code}
                       type="button"
@@ -992,6 +1028,12 @@ function PublicInvoicePage() {
                       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                     </button>
                   ))}
+
+                  {activeTripayChannels.length === 0 && (
+                    <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+                      Belum ada saluran pembayaran aktif di akun Tripay. Silakan hubungi pengelola atau aktifkan saluran di dashboard Tripay.
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-3 flex justify-end gap-2">
