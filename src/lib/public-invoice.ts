@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import crypto from "crypto";
-import { DEFAULT_GENERAL_SETTINGS, GeneralSettings } from "./settings";
+import { DEFAULT_GENERAL_SETTINGS, GeneralSettings, DEFAULT_TRIPAY_CONFIG } from "./settings";
 import { DEFAULT_MANUAL_BANKS, ManualBankAccount } from "./manual-banks";
 import { sqlite } from "./db";
 
@@ -9,6 +9,7 @@ export interface PublicInvoiceResult {
   invoice: any | null;
   settings?: GeneralSettings;
   manualBanks?: ManualBankAccount[];
+  isTripayEnabled?: boolean;
   error?: string;
 }
 
@@ -73,7 +74,22 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
         } catch {}
       }
 
-      // 3. Query invoice by ID or invoice_number
+      // 3. Fetch Tripay status (Check toggle on/off)
+      let isTripayEnabled = DEFAULT_TRIPAY_CONFIG.isEnabled;
+      const tripayRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'tripay'").get() as any;
+      if (tripayRow?.value) {
+        try {
+          const parsed = JSON.parse(tripayRow.value);
+          isTripayEnabled =
+            parsed.isEnabled !== undefined
+              ? Boolean(parsed.isEnabled)
+              : parsed.is_enabled !== undefined
+              ? Boolean(parsed.is_enabled)
+              : DEFAULT_TRIPAY_CONFIG.isEnabled;
+        } catch {}
+      }
+
+      // 4. Query invoice by ID or invoice_number
       const inv = sqlite
         .prepare("SELECT * FROM invoices WHERE id = ? OR invoice_number = ?")
         .get(id, id) as any;
@@ -106,6 +122,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
           },
           settings: generalSettings,
           manualBanks,
+          isTripayEnabled,
         };
       }
     } catch (err) {
@@ -117,6 +134,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
       invoice: null,
       settings: generalSettings,
       manualBanks,
+      isTripayEnabled: DEFAULT_TRIPAY_CONFIG.isEnabled,
       error: "Invoice tidak ditemukan",
     };
   });

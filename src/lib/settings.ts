@@ -82,6 +82,31 @@ export async function getTripaySettings(): Promise<TripaySettings & { source: "d
 }
 
 /**
+ * Returns currently cached Tripay settings from localStorage synchronously.
+ */
+export function getCachedTripaySettings(): TripaySettings {
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem(STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return {
+          ...DEFAULT_TRIPAY_CONFIG,
+          ...parsed,
+          isEnabled:
+            parsed.isEnabled !== undefined
+              ? Boolean(parsed.isEnabled)
+              : parsed.is_enabled !== undefined
+              ? Boolean(parsed.is_enabled)
+              : DEFAULT_TRIPAY_CONFIG.isEnabled,
+        };
+      }
+    } catch {}
+  }
+  return DEFAULT_TRIPAY_CONFIG;
+}
+
+/**
  * Saves Tripay gateway configuration to the database and syncs to local storage cache.
  */
 export async function saveTripaySettings(newSettings: TripaySettings): Promise<SaveSettingsResult> {

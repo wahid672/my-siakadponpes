@@ -65,6 +65,12 @@ export const createTripayTransactionServerFn = createServerFn({ method: "POST" }
   .validator((params: TripayCreateTransactionParams) => params)
   .handler(async ({ data: params }): Promise<{ success: boolean; data?: TripayTransactionResponse; message?: string }> => {
     const dbConfig = await getTripaySettings();
+    if (!dbConfig.isEnabled) {
+      return {
+        success: false,
+        message: "Layanan pembayaran otomatis (Tripay) sedang dinonaktifkan oleh administrator.",
+      };
+    }
     const baseUrl = getTripayBaseUrl(dbConfig.mode);
 
     try {

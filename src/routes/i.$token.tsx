@@ -36,6 +36,8 @@ import {
   getCachedGeneralSettings,
   GeneralSettings,
   DEFAULT_GENERAL_SETTINGS,
+  getTripaySettings,
+  getCachedTripaySettings,
 } from "@/lib/settings";
 import {
   ManualBankAccount,
@@ -66,9 +68,10 @@ export const Route = createFileRoute("/i/$token")({
         invoice: res?.invoice ?? null,
         settings: res?.settings ?? null,
         manualBanks: res?.manualBanks ?? null,
+        isTripayEnabled: res?.isTripayEnabled ?? true,
       };
     } catch {
-      return { invoice: null, settings: null, manualBanks: null };
+      return { invoice: null, settings: null, manualBanks: null, isTripayEnabled: true };
     }
   },
   component: PublicInvoicePage,
@@ -82,6 +85,7 @@ function PublicInvoicePage() {
     invoice: any;
     settings: GeneralSettings | null;
     manualBanks: ManualBankAccount[] | null;
+    isTripayEnabled?: boolean;
   } | null;
   const initialInvoice = loaderData?.invoice ?? null;
   const initialSettings = loaderData?.settings ?? null;
@@ -93,6 +97,11 @@ function PublicInvoicePage() {
   const [selectedManualBankId, setSelectedManualBankId] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activePayment, setActivePayment] = useState<ActivePaymentData | null>(null);
+  const [isTripayEnabled, setIsTripayEnabled] = useState<boolean>(() => {
+    if (loaderData?.isTripayEnabled !== undefined) return loaderData.isTripayEnabled;
+    return getCachedTripaySettings().isEnabled;
+  });
+  const [paymentTab, setPaymentTab] = useState<string>("manual");
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(() => {
     return initialSettings || getCachedGeneralSettings();
   });
@@ -108,6 +117,9 @@ function PublicInvoicePage() {
     getManualBankAccounts().then((b) => {
       if (mounted) setManualBanks(b);
     });
+    getTripaySettings().then((cfg) => {
+      if (mounted) setIsTripayEnabled(cfg.isEnabled);
+    });
 
     const handleUpdate = (e: any) => {
       if (e?.detail) setGeneralSettings(e.detail);
@@ -115,13 +127,20 @@ function PublicInvoicePage() {
     const handleBanksUpdate = (e: any) => {
       if (e?.detail) setManualBanks(e.detail);
     };
+    const handleTripayUpdate = (e: any) => {
+      if (e?.detail && typeof e.detail.isEnabled === "boolean") {
+        setIsTripayEnabled(e.detail.isEnabled);
+      }
+    };
     window.addEventListener("general_settings_updated", handleUpdate);
     window.addEventListener("manual_banks_updated", handleBanksUpdate);
+    window.addEventListener("tripay_settings_updated", handleTripayUpdate);
 
     return () => {
       mounted = false;
       window.removeEventListener("general_settings_updated", handleUpdate);
       window.removeEventListener("manual_banks_updated", handleBanksUpdate);
+      window.removeEventListener("tripay_settings_updated", handleTripayUpdate);
     };
   }, []);
 
@@ -134,6 +153,7 @@ function PublicInvoicePage() {
         if (res?.success && res.invoice) {
           if (res.settings) setGeneralSettings(res.settings);
           if (res.manualBanks) setManualBanks(res.manualBanks);
+          if (res.isTripayEnabled !== undefined) setIsTripayEnabled(res.isTripayEnabled);
           return res.invoice;
         }
       } catch (err) {
@@ -693,18 +713,155 @@ function PublicInvoicePage() {
               <span className="font-bold text-base text-primary">{rupiah(Number(inv.total))}</span>
             </div>
 
-            <Tabs defaultValue="manual" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="manual" className="flex items-center gap-1.5 text-xs">
-                  <Building2 className="h-3.5 w-3.5" /> Transfer Manual
-                </TabsTrigger>
-                <TabsTrigger value="tripay" className="flex items-center gap-1.5 text-xs">
-                  <Zap className="h-3.5 w-3.5" /> Otomatis (Tripay)
-                </TabsTrigger>
-              </TabsList>
+            {isTripayEnabled ? (
+              <Tabs value={paymentTab} onValueChange={setPaymentTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="manual" className="flex items-center gap-1.5 text-xs">
+                    <Building2 className="h-3.5 w-3.5" /> Transfer Manual
+                  </TabsTrigger>
+                  <TabsTrigger value="tripay" className="flex items-center gap-1.5 text-xs">
+                    <Zap className="h-3.5 w-3.5" /> Otomatis (Tripay)
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Tab 1: Manual Bank Transfer */}
-              <TabsContent value="manual" className="space-y-3 pt-3">
+                {/* Tab 1: Manual Bank Transfer */}
+                <TabsContent value="manual" className="space-y-3 pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Pilih rekening resmi untuk transfer langsung tanpa biaya admin gateway:
+                  </p>
+
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {manualBanks.filter((b) => b.isActive).map((b) => {
+                      const logo = normalizeBankLogoUrl(b.logoUrl, b.bankCode);
+                      const isSelected = selectedManualBankId === b.id || (!selectedManualBankId && manualBanks.filter((x) => x.isActive)[0]?.id === b.id);
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => setSelectedManualBankId(b.id)}
+                          className={`cursor-pointer rounded-xl border p-3 transition ${
+                            isSelected
+                              ? "border-primary bg-primary/5 ring-1 ring-primary"
+                              : "bg-card hover:bg-muted/40"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-14 items-center justify-center rounded-lg border bg-white p-1 shadow-2xs shrink-0">
+                                {logo ? (
+                                  <img
+                                    src={logo}
+                                    alt={b.bankName}
+                                    className="max-h-full max-w-full object-contain"
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : (
+                                  <Building2 className="h-5 w-5 text-slate-400" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-bold text-xs sm:text-sm text-foreground">{b.bankName}</p>
+                                <p className="font-mono text-xs font-semibold text-primary">{b.accountNumber}</p>
+                                <p className="text-[10px] text-muted-foreground">a.n. {b.accountHolder}</p>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 pt-1">
+                              <div
+                                className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                                  isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground"
+                                }`}
+                              >
+                                {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                              </div>
+                            </div>
+                          </div>
+
+                          {b.instructions && (
+                            <p className="mt-2 text-[10px] text-muted-foreground border-t pt-1 italic">
+                              {b.instructions}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {manualBanks.filter((b) => b.isActive).length === 0 && (
+                      <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+                        Belum ada rekening manual yang diaktifkan. Silakan gunakan saluran pembayaran otomatis Tripay.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t pt-3 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setPayModalOpen(false)}>
+                      Batal
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const activeList = manualBanks.filter((b) => b.isActive);
+                        const chosen = activeList.find((b) => b.id === selectedManualBankId) || activeList[0];
+                        if (chosen) handleSelectManualBank(chosen);
+                        else toast.error("Pilih salah satu rekening bank terlebih dahulu.");
+                      }}
+                      disabled={manualBanks.filter((b) => b.isActive).length === 0 || isProcessingPayment}
+                      className="bg-primary text-primary-foreground font-semibold"
+                    >
+                      Gunakan Rekening Ini
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* Tab 2: Tripay Gateway */}
+                <TabsContent value="tripay" className="space-y-3 pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Pilih Virtual Account atau QRIS untuk verifikasi pembayaran otomatis instan:
+                  </p>
+
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {DEFAULT_TRIPAY_CHANNELS.map((ch) => (
+                      <button
+                        key={ch.code}
+                        type="button"
+                        onClick={() => setSelectedChannel(ch.code)}
+                        className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition ${
+                          selectedChannel === ch.code
+                            ? "border-primary bg-primary/10 text-primary font-semibold"
+                            : "bg-background hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {ch.icon_url && (
+                            <img src={ch.icon_url} alt={ch.name} className="h-6 w-auto max-w-10 object-contain shrink-0" />
+                          )}
+                          <div>
+                            <p className="text-xs font-semibold">{ch.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{ch.group}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="border-t pt-3 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setPayModalOpen(false)}>
+                      Batal
+                    </Button>
+                    <Button onClick={handleStartPayment} disabled={!selectedChannel || isProcessingPayment}>
+                      {isProcessingPayment ? "Menghubungi Tripay..." : "Lanjutkan Pembayaran"}
+                    </Button>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            ) : (
+              /* Tampilan langsung Transfer Manual jika Tripay OFF */
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-2 border-b pb-2 text-xs font-semibold text-foreground">
+                  <Building2 className="h-4 w-4 text-primary" /> Transfer Bank Manual
+                </div>
+
                 <p className="text-xs text-muted-foreground">
                   Pilih rekening resmi untuk transfer langsung tanpa biaya admin gateway:
                 </p>
@@ -768,7 +925,7 @@ function PublicInvoicePage() {
 
                   {manualBanks.filter((b) => b.isActive).length === 0 && (
                     <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
-                      Belum ada rekening manual yang diaktifkan. Silakan gunakan saluran pembayaran otomatis Tripay.
+                      Belum ada rekening transfer manual yang diaktifkan. Silakan hubungi pihak pengelola / admin.
                     </div>
                   )}
                 </div>
@@ -790,50 +947,8 @@ function PublicInvoicePage() {
                     Gunakan Rekening Ini
                   </Button>
                 </div>
-              </TabsContent>
-
-              {/* Tab 2: Tripay Gateway */}
-              <TabsContent value="tripay" className="space-y-3 pt-3">
-                <p className="text-xs text-muted-foreground">
-                  Pilih Virtual Account atau QRIS untuk verifikasi pembayaran otomatis instan:
-                </p>
-
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {DEFAULT_TRIPAY_CHANNELS.map((ch) => (
-                    <button
-                      key={ch.code}
-                      type="button"
-                      onClick={() => setSelectedChannel(ch.code)}
-                      className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition ${
-                        selectedChannel === ch.code
-                          ? "border-primary bg-primary/10 text-primary font-semibold"
-                          : "bg-background hover:bg-muted/40"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {ch.icon_url && (
-                          <img src={ch.icon_url} alt={ch.name} className="h-6 w-auto max-w-10 object-contain shrink-0" />
-                        )}
-                        <div>
-                          <p className="text-xs font-semibold">{ch.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{ch.group}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
-                </div>
-
-                <div className="border-t pt-3 flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setPayModalOpen(false)}>
-                    Batal
-                  </Button>
-                  <Button onClick={handleStartPayment} disabled={!selectedChannel || isProcessingPayment}>
-                    {isProcessingPayment ? "Menghubungi Tripay..." : "Lanjutkan Pembayaran"}
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
