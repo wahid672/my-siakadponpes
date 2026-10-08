@@ -412,6 +412,7 @@ function InvoiceView() {
     await downloadInvoicePdf({
       elementId: "printable-invoice-paper",
       filename,
+      status: inv.status,
       onStart: () => {
         setIsDownloadingPdf(true);
         toast.info("Menyiapkan dokumen PDF...");

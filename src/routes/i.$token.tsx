@@ -432,6 +432,7 @@ function PublicInvoicePage() {
       await downloadInvoicePdf({
         elementId: "printable-invoice-paper",
         filename,
+        status: inv.status,
         onSuccess: () => {
           toast.success("File PDF berhasil diunduh!");
           setIsDownloadingPdf(false);

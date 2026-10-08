@@ -4,6 +4,7 @@ import html2canvas from "html2canvas-pro";
 export interface DownloadPdfOptions {
   elementId?: string;
   filename?: string;
+  status?: string;
   onStart?: () => void;
   onSuccess?: () => void;
   onError?: (err: any) => void;
@@ -105,39 +106,66 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
       (el as HTMLElement).style.display = "none";
     });
 
-    // 4. Extract Status from Ribbon before removing HTML element
+    // 4. Resolve Status for Ribbon (guaranteed via options.status or DOM fallback)
     clone.querySelectorAll(".invoice-status-badge").forEach((el) => (el as HTMLElement).remove());
 
-    const ribbonEl = (clone.querySelector(".rotate-45") || original.querySelector(".rotate-45")) as HTMLElement | null;
-    let ribbonText = "";
-    let ribbonBgColor = "#e11d48";
-    let hasRibbon = false;
+    let statusText = "";
+    let ribbonRgb: [number, number, number] = [225, 29, 72]; // Rose 600 default (UNPAID)
+    let shouldDrawRibbon = true;
 
-    if (ribbonEl) {
-      hasRibbon = true;
-      const rawText = ribbonEl.innerText.trim();
-      const txt = rawText.toUpperCase();
-      if (txt.includes("PAID") || txt.includes("LUNAS")) {
-        ribbonBgColor = "#059669";
-        ribbonText = "LUNAS";
-      } else if (txt.includes("PENDING") || txt.includes("MENUNGGU")) {
-        ribbonBgColor = "#d97706";
-        ribbonText = "PENDING";
-      } else if (txt.includes("CANCEL") || txt.includes("BATAL")) {
-        ribbonBgColor = "#52525b";
-        ribbonText = "DIBATALKAN";
-      } else if (txt.includes("EXPIR") || txt.includes("KEDALUWARSA")) {
-        ribbonBgColor = "#ea580c";
-        ribbonText = "KEDALUWARSA";
+    const rawStatus = (options.status || "").toLowerCase().trim();
+    if (rawStatus) {
+      if (rawStatus === "paid") {
+        statusText = "PAID";
+        ribbonRgb = [5, 150, 105]; // Emerald 600
+      } else if (rawStatus === "pending") {
+        statusText = "PENDING";
+        ribbonRgb = [217, 119, 6]; // Amber 600
+      } else if (rawStatus === "cancelled") {
+        statusText = "DIBATALKAN";
+        ribbonRgb = [82, 82, 91]; // Zinc 600
+      } else if (rawStatus === "expired") {
+        statusText = "KEDALUWARSA";
+        ribbonRgb = [234, 88, 12]; // Orange 600
       } else {
-        ribbonBgColor = "#e11d48";
-        ribbonText = "BELUM BAYAR";
+        statusText = "UNPAID";
+        ribbonRgb = [225, 29, 72]; // Rose 600
+      }
+    } else {
+      // DOM Fallback
+      const ribbonEl = (clone.querySelector(".rotate-45") || original.querySelector(".rotate-45")) as HTMLElement | null;
+      if (ribbonEl) {
+        const domTxt = (ribbonEl.textContent || ribbonEl.innerText || "").trim().toUpperCase();
+        if (domTxt.includes("PAID") || domTxt.includes("LUNAS")) {
+          statusText = "PAID";
+          ribbonRgb = [5, 150, 105];
+        } else if (domTxt.includes("PENDING") || domTxt.includes("MENUNGGU")) {
+          statusText = "PENDING";
+          ribbonRgb = [217, 119, 6];
+        } else if (domTxt.includes("CANCEL") || domTxt.includes("BATAL")) {
+          statusText = "DIBATALKAN";
+          ribbonRgb = [82, 82, 91];
+        } else if (domTxt.includes("EXPIR") || domTxt.includes("KEDALUWARSA")) {
+          statusText = "KEDALUWARSA";
+          ribbonRgb = [234, 88, 12];
+        } else if (domTxt.includes("UNPAID") || domTxt.includes("BELUM")) {
+          statusText = "UNPAID";
+          ribbonRgb = [225, 29, 72];
+        } else if (domTxt) {
+          statusText = domTxt;
+          ribbonRgb = [217, 119, 6];
+        } else {
+          statusText = "UNPAID";
+          ribbonRgb = [225, 29, 72];
+        }
+      } else {
+        shouldDrawRibbon = false;
       }
     }
 
     // CRITICAL: Remove the HTML ribbon from the clone completely so html2canvas
     // does not attempt to render CSS transforms (which causes vertical rendering bugs).
-    // We will draw a pristine 45-degree ribbon directly onto the 2D canvas instead.
+    // We will draw a pristine 45-degree vector ribbon directly into the PDF document.
     clone.querySelectorAll(".rotate-45").forEach((el) => (el as HTMLElement).remove());
 
     // 5. Enforce Desktop A4 Layout for Header (Brand Left, Meta Right)
@@ -178,7 +206,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
         headerRight.style.textAlign = "right";
         headerRight.style.borderTop = "none";
         headerRight.style.paddingTop = "0";
-        headerRight.style.paddingRight = "54px"; // Safe breathing room from diagonal corner ribbon
+        headerRight.style.paddingRight = "64px"; // Safe breathing room from diagonal corner ribbon
         headerRight.style.marginRight = "0";
 
         const titleH1 = headerRight.querySelector("h1");
@@ -391,12 +419,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
       });
     }
 
-    // 12. Draw crisp, pixel-perfect 45-degree Corner Ribbon directly onto Canvas
-    if (hasRibbon && ribbonText) {
-      drawCornerRibbon(canvas, ribbonText, ribbonBgColor, clone.offsetWidth || 800);
-    }
-
-    // 13. Create Standard A4 Portrait PDF Document
+    // 12. Create Standard A4 Portrait PDF Document
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -409,6 +432,11 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
 
     const imgData = canvas.toDataURL("image/jpeg", 0.96);
     pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+
+    // 13. Draw crisp, pixel-perfect 45-degree Vector Corner Ribbon directly on PDF
+    if (shouldDrawRibbon && statusText) {
+      drawPdfCornerRibbon(pdf, statusText, ribbonRgb);
+    }
 
     const safeFilename = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
     pdf.save(safeFilename);
@@ -426,60 +454,59 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
 }
 
 /**
- * Draws a sharp, pixel-perfect 45-degree ribbon across the top-right corner of the canvas.
- * This completely avoids browser/html2canvas CSS transform matrix bugs where rotate(45deg)
- * fails or renders vertically.
+ * Draws a pristine, razor-sharp 45-degree vector status ribbon across the top-right corner
+ * of the A4 PDF page. Using native jsPDF vector primitives guarantees 100% reliability,
+ * exact 45° angle, and zero reliance on browser/html2canvas CSS transform bugs.
  */
-function drawCornerRibbon(
-  canvas: HTMLCanvasElement,
+function drawPdfCornerRibbon(
+  pdf: jsPDF,
   text: string,
-  bgColor: string,
-  cloneWidth: number = 800
+  rgb: [number, number, number]
 ): void {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  const [r, g, b] = rgb;
+  const pageWidth = 210; // A4 width in mm
 
-  const scale = canvas.width / (cloneWidth || 800);
-  const offset = 96 * scale; // Distance along top & right edges from corner
-  const centerX = canvas.width - offset / 2;
-  const centerY = offset / 2;
-  const bandLength = 300 * scale;
-  const bandThickness = 24 * scale;
+  // Outer diagonal: (pageWidth - 44, 0) to (pageWidth, 44) => angle 45 deg
+  // Inner diagonal: (pageWidth - 32, 0) to (pageWidth, 32) => angle 45 deg
+  // Perpendicular thickness = (44 - 32) * cos(45 deg) = 12 * 0.7071 ≈ 8.5 mm
+  const dOuter = 44;
+  const dInner = 32;
 
-  ctx.save();
+  const p1x = pageWidth - dOuter; // 166
+  const p1y = 0;
+  const p2x = pageWidth - dInner; // 178
+  const p2y = 0;
+  const p3x = pageWidth;          // 210
+  const p3y = dInner;             // 32
+  const p4x = pageWidth;          // 210
+  const p4y = dOuter;             // 44
 
-  // 1. Clip to canvas boundaries so ribbon stays within the invoice document
-  ctx.beginPath();
-  ctx.rect(0, 0, canvas.width, canvas.height);
-  ctx.clip();
+  // 1. Draw ribbon background with two triangles forming the quadrilateral
+  pdf.setFillColor(r, g, b);
+  pdf.triangle(p1x, p1y, p2x, p2y, p3x, p3y, "F");
+  pdf.triangle(p1x, p1y, p3x, p3y, p4x, p4y, "F");
 
-  // 2. Position origin at diagonal midpoint and rotate 45 degrees
-  ctx.translate(centerX, centerY);
-  ctx.rotate(Math.PI / 4);
+  // 2. Draw subtle border highlight lines for realistic ribbon finish
+  pdf.setDrawColor(Math.max(0, r - 30), Math.max(0, g - 30), Math.max(0, b - 30));
+  pdf.setLineWidth(0.3);
+  pdf.line(p1x, p1y, p4x, p4y); // Outer edge
+  pdf.line(p2x, p2y, p3x, p3y); // Inner edge
 
-  // 3. Ribbon background
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(-bandLength / 2, -bandThickness / 2, bandLength, bandThickness);
+  // 3. Draw Rotated Text
+  // Center: ((166 + 178) / 2 + 210) / 2 = 191 mm, (0 + 38) / 2 = 19 mm
+  const centerX = (p1x + p2x + p3x + p4x) / 4; // 191 mm
+  const centerY = (p1y + p2y + p3y + p4y) / 4; // 19 mm
 
-  // 4. Subtle borders for ribbon depth
-  ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
-  ctx.fillRect(-bandLength / 2, bandThickness / 2 - 1.5 * scale, bandLength, 1.5 * scale);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.20)";
-  ctx.fillRect(-bandLength / 2, -bandThickness / 2, bandLength, 1.5 * scale);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
 
-  // 5. Draw text
-  ctx.fillStyle = "#ffffff";
-  const fontSize = Math.round(10.5 * scale);
-  ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  if ("letterSpacing" in ctx) {
-    (ctx as any).letterSpacing = `${2 * scale}px`;
-  }
-
-  ctx.fillText(text.toUpperCase(), 0, 0);
-
-  ctx.restore();
+  // angle: -45 rotates clockwise (sloping down-right, exactly matching the 45-degree ribbon)
+  pdf.text(text.toUpperCase(), centerX, centerY, {
+    angle: -45,
+    align: "center",
+    baseline: "middle",
+  });
 }
+
 
