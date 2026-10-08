@@ -105,12 +105,40 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
       (el as HTMLElement).style.display = "none";
     });
 
-    // 4. Handle Status Badge in Header (Eliminate broken html2canvas transforms and header text overlap)
+    // 4. Enforce Desktop A4 Layout for Ribbon Status Badge
+    clone.querySelectorAll(".invoice-status-badge").forEach((el) => (el as HTMLElement).remove());
+
     const ribbon = clone.querySelector(".rotate-45") as HTMLElement;
-    let fallbackStatusText = "";
     if (ribbon) {
-      fallbackStatusText = ribbon.innerText.trim();
-      ribbon.remove();
+      ribbon.style.display = "block";
+      ribbon.style.visibility = "visible";
+      ribbon.style.position = "absolute";
+      ribbon.style.right = "-42px";
+      ribbon.style.top = "24px";
+      ribbon.style.width = "170px";
+      ribbon.style.transform = "rotate(45deg)";
+      ribbon.style.transformOrigin = "center";
+      (ribbon.style as any).webkitTransform = "rotate(45deg)";
+      ribbon.style.textAlign = "center";
+      ribbon.style.padding = "4px 0";
+      ribbon.style.fontSize = "11px";
+      ribbon.style.fontWeight = "800";
+      ribbon.style.letterSpacing = "0.12em";
+      ribbon.style.color = "#ffffff";
+      ribbon.style.boxShadow = "none";
+      ribbon.style.zIndex = "10";
+      ribbon.style.opacity = "1";
+
+      const txt = ribbon.innerText.trim().toUpperCase();
+      if (txt.includes("PAID") || txt.includes("LUNAS")) {
+        ribbon.style.backgroundColor = "#059669";
+      } else if (txt.includes("PENDING")) {
+        ribbon.style.backgroundColor = "#d97706";
+      } else if (txt.includes("CANCELLED") || txt.includes("DIBATALKAN") || txt.includes("EXPIRED") || txt.includes("KEDALUWARSA")) {
+        ribbon.style.backgroundColor = "#52525b";
+      } else {
+        ribbon.style.backgroundColor = "#e11d48";
+      }
     }
 
     // 5. Enforce Desktop A4 Layout for Header (Brand Left, Meta Right)
@@ -142,7 +170,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
         }
       }
 
-      // Header Right (INVOICE, Invoice Number, Status Badge, Issue & Due Date)
+      // Header Right (INVOICE, Invoice Number, Issue & Due Date)
       const headerRight = headerEl.children[1] as HTMLElement;
       if (headerRight) {
         headerRight.style.display = "flex";
@@ -151,7 +179,7 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
         headerRight.style.textAlign = "right";
         headerRight.style.borderTop = "none";
         headerRight.style.paddingTop = "0";
-        headerRight.style.paddingRight = "0";
+        headerRight.style.paddingRight = "54px"; // Safe breathing room from diagonal corner ribbon
         headerRight.style.marginRight = "0";
 
         const titleH1 = headerRight.querySelector("h1");
@@ -171,68 +199,6 @@ export async function downloadInvoicePdf(options: DownloadPdfOptions = {}): Prom
           invNumP.style.color = "#475569";
           invNumP.style.marginTop = "4px";
           invNumP.style.marginBottom = "0";
-        }
-
-        // Style or inject the Status Badge Pill to 100% match application theme
-        let statusBadgeWrap = headerRight.querySelector(".invoice-status-badge") as HTMLElement;
-        let statusBadge = headerRight.querySelector(".invoice-status-badge span") as HTMLElement;
-
-        if (!statusBadge && fallbackStatusText) {
-          statusBadgeWrap = document.createElement("div");
-          statusBadgeWrap.className = "invoice-status-badge";
-          statusBadge = document.createElement("span");
-          statusBadge.innerText = fallbackStatusText;
-          statusBadgeWrap.appendChild(statusBadge);
-
-          // Insert right after invNumP or titleH1
-          if (invNumP && invNumP.nextSibling) {
-            headerRight.insertBefore(statusBadgeWrap, invNumP.nextSibling);
-          } else if (titleH1 && titleH1.nextSibling) {
-            headerRight.insertBefore(statusBadgeWrap, titleH1.nextSibling);
-          } else {
-            headerRight.appendChild(statusBadgeWrap);
-          }
-        }
-
-        if (statusBadgeWrap) {
-          statusBadgeWrap.style.marginTop = "8px";
-          statusBadgeWrap.style.marginBottom = "6px";
-          statusBadgeWrap.style.display = "block";
-        }
-
-        if (statusBadge) {
-          statusBadge.style.display = "inline-flex";
-          statusBadge.style.alignItems = "center";
-          statusBadge.style.padding = "3px 12px";
-          statusBadge.style.borderRadius = "9999px";
-          statusBadge.style.fontSize = "10px";
-          statusBadge.style.fontWeight = "800";
-          statusBadge.style.letterSpacing = "0.06em";
-          statusBadge.style.textTransform = "uppercase";
-
-          const txt = statusBadge.innerText.toUpperCase();
-          if (txt.includes("PAID") || txt.includes("LUNAS")) {
-            statusBadge.style.backgroundColor = "#ecfdf5";
-            statusBadge.style.color = "#059669";
-            statusBadge.style.border = "1px solid #a7f3d0";
-          } else if (txt.includes("PENDING")) {
-            statusBadge.style.backgroundColor = "#fffbeb";
-            statusBadge.style.color = "#d97706";
-            statusBadge.style.border = "1px solid #fde68a";
-          } else if (txt.includes("CANCELLED") || txt.includes("DIBATALKAN")) {
-            statusBadge.style.backgroundColor = "#f4f4f5";
-            statusBadge.style.color = "#71717a";
-            statusBadge.style.border = "1px solid #e4e4e7";
-          } else if (txt.includes("EXPIRED") || txt.includes("KEDALUWARSA")) {
-            statusBadge.style.backgroundColor = "#fff7ed";
-            statusBadge.style.color = "#ea580c";
-            statusBadge.style.border = "1px solid #fed7aa";
-          } else {
-            // UNPAID / BELUM BAYAR default
-            statusBadge.style.backgroundColor = "#fff1f2";
-            statusBadge.style.color = "#e11d48";
-            statusBadge.style.border = "1px solid #fecdd3";
-          }
         }
       }
     }
