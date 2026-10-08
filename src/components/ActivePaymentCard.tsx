@@ -5,10 +5,8 @@ import {
   Check,
   Clock,
   ExternalLink,
-  RefreshCw,
   QrCode,
   ShieldCheck,
-  CheckCircle2,
   MessageSquare,
   Building2,
   ArrowLeftRight,
@@ -426,33 +424,6 @@ export function ActivePaymentCard({
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </div>
-      )}
-
-      {/* 4. Sandbox Testing Bar */}
-      {onSimulatePaid && (
-        <div className="border-t border-dashed border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 sm:px-5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-          <div className="text-muted-foreground">
-            <p className="font-semibold text-emerald-800 dark:text-emerald-300 text-[11px]">Mode Sandbox / Simulasi Pembayaran</p>
-            <p className="text-[10px]">
-              Klik tombol di samping untuk langsung mengubah status invoice menjadi LUNAS pada simulasi.
-            </p>
-          </div>
-
-          <Button
-            type="button"
-            size="sm"
-            onClick={onSimulatePaid}
-            disabled={isSimulating}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-7.5 shrink-0 gap-1"
-          >
-            {isSimulating ? (
-              <RefreshCw className="h-3 w-3 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-3 w-3" />
-            )}
-            Simulasi Pelunasan (Sandbox OK)
-          </Button>
         </div>
       )}
     </section>
