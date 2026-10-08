@@ -264,23 +264,17 @@ function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Catatan Default (Notes)</Label>
+                  <Label>Catatan & Syarat Pembayaran Default (Notes)</Label>
                   <Textarea
-                    rows={2}
+                    rows={3}
                     value={settings.defaultNotes}
                     onChange={(e) => setSettings({ ...settings, defaultNotes: e.target.value })}
                     disabled={loading}
+                    placeholder="Contoh: Pembayaran dapat dilakukan melalui transfer rekening atau QRIS resmi SIAKAD PONPES."
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Syarat & Ketentuan Default (Terms & Conditions)</Label>
-                  <Textarea
-                    rows={2}
-                    value={settings.defaultTerms}
-                    onChange={(e) => setSettings({ ...settings, defaultTerms: e.target.value })}
-                    disabled={loading}
-                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Teks ini otomatis digunakan sebagai catatan default saat membuat invoice baru dan ditampilkan pada lembar invoice publik serta cetak PDF.
+                  </p>
                 </div>
               </div>
             </div>

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Plus, Trash2, ArrowLeft, Sparkles } from "lucide-react";
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useProfiles } from "@/lib/admin-queries";
 import { rupiah } from "@/lib/auth";
+import { getCachedGeneralSettings, getGeneralSettings } from "@/lib/settings";
 
 export const Route = createFileRoute("/admin/invoices/new")({
   head: () => ({
@@ -26,11 +27,11 @@ export const Route = createFileRoute("/admin/invoices/new")({
 });
 
 const today = new Date().toISOString().slice(0, 10);
-const genNumber = () => {
+const genNumber = (prefix = "INV") => {
   const d = new Date();
   const yearMonthDay = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
   const randomSuffix = String(Math.floor(Math.random() * 900) + 100);
-  return `INV-${yearMonthDay}-${randomSuffix}`;
+  return `${prefix || "INV"}-${yearMonthDay}-${randomSuffix}`;
 };
 
 const SAMPLE_PRESETS = [
@@ -45,8 +46,14 @@ export function NewInvoice() {
   const qc = useQueryClient();
   const { data: profiles = [] } = useProfiles();
 
+  const { data: generalSettings } = useQuery({
+    queryKey: ["general-settings"],
+    queryFn: getGeneralSettings,
+    initialData: getCachedGeneralSettings,
+  });
+
   const [userId, setUserId] = useState("");
-  const [invoiceNumber, setInvoiceNumber] = useState(genNumber);
+  const [invoiceNumber, setInvoiceNumber] = useState(() => genNumber(generalSettings?.invoicePrefix));
   const [issueDate, setIssueDate] = useState(today);
   const [dueDate, setDueDate] = useState(today);
   const [items, setItems] = useState([
@@ -54,9 +61,31 @@ export function NewInvoice() {
   ]);
   const [taxRate, setTaxRate] = useState(0);
   const [discount, setDiscount] = useState(0);
-  const [notes, setNotes] = useState("Pembayaran dapat dilakukan melalui transfer rekening atau QRIS resmi SIAKAD PONPES.");
-  const [terms, setTerms] = useState("Invoice ini berlaku sebagai bukti penagihan resmi yang sah.");
+  const [notes, setNotes] = useState(() => generalSettings?.defaultNotes || "Pembayaran dapat dilakukan melalui transfer rekening atau QRIS resmi SIAKAD PONPES.");
   const [saving, setSaving] = useState(false);
+
+  // Sinkronkan catatan default dan prefix nomor invoice dari pengaturan jika tiba dari database
+  useEffect(() => {
+    if (generalSettings?.defaultNotes) {
+      setNotes((prev) => {
+        if (!prev || prev === "Pembayaran dapat dilakukan melalui transfer rekening atau QRIS resmi SIAKAD PONPES.") {
+          return generalSettings.defaultNotes;
+        }
+        return prev;
+      });
+    }
+  }, [generalSettings?.defaultNotes]);
+
+  useEffect(() => {
+    if (generalSettings?.invoicePrefix && generalSettings.invoicePrefix !== "INV") {
+      setInvoiceNumber((prev) => {
+        if (prev.startsWith("INV-")) {
+          return prev.replace(/^INV-/, `${generalSettings.invoicePrefix}-`);
+        }
+        return prev;
+      });
+    }
+  }, [generalSettings?.invoicePrefix]);
 
   const subtotal = items.reduce((acc, it) => acc + (Number(it.amount) || 0) * (Number(it.quantity) || 1), 0);
   const taxAmount = (subtotal * taxRate) / 100;
@@ -280,22 +309,17 @@ export function NewInvoice() {
         <div className="grid gap-6 border-t pt-6 md:grid-cols-2">
           <div className="space-y-4">
             <div>
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Catatan Tambahan</Label>
+              <Label className="text-xs uppercase font-bold text-muted-foreground">Catatan & Syarat Pembayaran</Label>
               <Textarea
-                rows={2}
+                rows={4}
                 className="mt-1.5"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                placeholder="Catatan tambahan dan ketentuan pembayaran untuk invoice ini..."
               />
-            </div>
-            <div>
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Ketentuan & Syarat (Terms)</Label>
-              <Textarea
-                rows={2}
-                className="mt-1.5"
-                value={terms}
-                onChange={(e) => setTerms(e.target.value)}
-              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Otomatis disinkronkan dari Catatan Default di menu Pengaturan. Anda tetap dapat mengeditnya khusus untuk invoice ini.
+              </p>
             </div>
           </div>
 
