@@ -486,33 +486,31 @@ function drawPdfCornerRibbon(
   pdf.triangle(p1x, p1y, p2x, p2y, p3x, p3y, "F");
   pdf.triangle(p1x, p1y, p3x, p3y, p4x, p4y, "F");
 
-  // 2. Draw sharp, centered uppercase status text with character spacing
-  const dMid = (dInner + dOuter) / 2; // 21.75 mm
-  const midX = pageWidth - dMid / 2;   // 199.125 mm
-  const midY = dMid / 2;               // 10.875 mm
-
-  // Fine-tuned typographic baseline offset to achieve optical vertical centering
-  const textX = midX - 0.45;
-  const textY = midY + 0.45;
+  // 2. Draw sharp, mathematically centered uppercase status text
+  const upperText = text.toUpperCase();
+  const fontSize = upperText.length > 8 ? 6.5 : 7.2;
 
   pdf.setTextColor(255, 255, 255);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(7.2);
+  pdf.setFontSize(fontSize);
 
-  if (typeof (pdf as any).setCharSpace === "function") {
-    (pdf as any).setCharSpace(0.35); // Matches Tailwind tracking-widest
-  }
+  const textWidth = pdf.getTextWidth(upperText);
+  const fontSizeMm = (fontSize * 25.4) / 72;
+  const hCap = fontSizeMm * 0.72; // Capital letter optical height
 
-  // angle: -45 rotates clockwise (sloping down-right, exactly matching the 45-degree ribbon)
-  pdf.text(text.toUpperCase(), textX, textY, {
+  const dMid = (dInner + dOuter) / 2; // 21.75 mm
+  const centerX = pageWidth - dMid / 2; // 199.125 mm
+  const centerY = dMid / 2; // 10.875 mm
+
+  // Exact 2D rotation offset to position the bounding box of uppercase text
+  // centered precisely along both the 45-degree ribbon length and perpendicular thickness.
+  // Avoids jsPDF's built-in align: 'center' rotation bug (which shifts unrotated X).
+  const startX = centerX - (textWidth + hCap) / (2 * Math.SQRT2);
+  const startY = centerY - (textWidth - hCap) / (2 * Math.SQRT2);
+
+  pdf.text(upperText, startX, startY, {
     angle: -45,
-    align: "center",
   });
-
-  // Reset character spacing after drawing ribbon text
-  if (typeof (pdf as any).setCharSpace === "function") {
-    (pdf as any).setCharSpace(0);
-  }
 }
 
 
