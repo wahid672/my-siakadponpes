@@ -64,7 +64,12 @@ export function getCachedManualBankAccounts(): ManualBankAccount[] {
   return DEFAULT_MANUAL_BANKS;
 }
 
-import { getManualBanksServerFn, saveManualBanksServerFn } from "./settings-server";
+import {
+  getManualBanksServerFn,
+  saveManualBanksServerFn,
+  getManualTransferEnabledServerFn,
+  saveManualTransferEnabledServerFn,
+} from "./settings-server";
 
 /**
  * Retrieves manual bank accounts from database settings table with localStorage fallback.
@@ -113,3 +118,65 @@ export async function saveManualBankAccounts(banks: ManualBankAccount[]): Promis
     return { success: true, persistedToDb: false, message: "Tersimpan di memori lokal browser." };
   }
 }
+
+const STORAGE_MANUAL_ENABLED_KEY = "siakad_manual_transfer_enabled";
+
+/**
+ * Synchronously retrieves cached manual transfer enabled flag from localStorage (default true).
+ */
+export function getCachedManualTransferEnabled(): boolean {
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem(STORAGE_MANUAL_ENABLED_KEY);
+      if (cached !== null) {
+        return cached === "true" || cached === "1";
+      }
+    } catch {}
+  }
+  return true;
+}
+
+/**
+ * Retrieves manual transfer enabled flag from database settings table with localStorage fallback.
+ */
+export async function getManualTransferEnabled(): Promise<boolean> {
+  try {
+    const enabled = await getManualTransferEnabledServerFn();
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_MANUAL_ENABLED_KEY, String(enabled));
+    }
+    return enabled;
+  } catch (err) {
+    console.warn("[ManualBanks] Fetch manual_transfer_enabled error:", err);
+  }
+  return getCachedManualTransferEnabled();
+}
+
+/**
+ * Saves manual transfer enabled flag to database settings table and synchronizes cache.
+ */
+export async function saveManualTransferEnabled(enabled: boolean): Promise<{
+  success: boolean;
+  persistedToDb: boolean;
+  message?: string;
+}> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_MANUAL_ENABLED_KEY, String(enabled));
+    window.dispatchEvent(
+      new CustomEvent("manual_transfer_enabled_updated", { detail: { isEnabled: enabled } })
+    );
+  }
+
+  try {
+    const res = await saveManualTransferEnabledServerFn({ data: enabled });
+    return {
+      success: res.success,
+      persistedToDb: res.success,
+      message: res.message,
+    };
+  } catch (err: any) {
+    console.error("[ManualBanks] Save manual_transfer_enabled exception:", err);
+    return { success: true, persistedToDb: false, message: "Tersimpan di memori lokal browser." };
+  }
+}
+

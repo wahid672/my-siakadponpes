@@ -15,6 +15,7 @@ import {
   HelpCircle,
   ShieldCheck,
   CreditCard,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,9 @@ import {
   ManualBankAccount,
   getManualBankAccounts,
   saveManualBankAccounts,
+  getCachedManualTransferEnabled,
+  getManualTransferEnabled,
+  saveManualTransferEnabled,
   DEFAULT_MANUAL_BANKS,
 } from "@/lib/manual-banks";
 import {
@@ -78,7 +82,11 @@ export function ManualBankSettings() {
   const [bankQuery, setBankQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Load banks on mount
+  // Global Manual Transfer Enabled Toggle
+  const [isManualTransferEnabled, setIsManualTransferEnabled] = useState(() => getCachedManualTransferEnabled());
+  const [savingToggle, setSavingToggle] = useState(false);
+
+  // Load banks and toggle status on mount
   useEffect(() => {
     let mounted = true;
     getManualBankAccounts().then((data) => {
@@ -87,6 +95,17 @@ export function ManualBankSettings() {
         setLoading(false);
       }
     });
+
+    getManualTransferEnabled().then((en) => {
+      if (mounted) setIsManualTransferEnabled(en);
+    });
+
+    const handleToggleUpdate = (e: any) => {
+      if (e?.detail && typeof e.detail.isEnabled === "boolean") {
+        setIsManualTransferEnabled(e.detail.isEnabled);
+      }
+    };
+    window.addEventListener("manual_transfer_enabled_updated", handleToggleUpdate);
 
     // Background fetch full dataset from GitHub
     fetchFullBankDataset().then((dataset) => {
@@ -97,6 +116,7 @@ export function ManualBankSettings() {
 
     return () => {
       mounted = false;
+      window.removeEventListener("manual_transfer_enabled_updated", handleToggleUpdate);
     };
   }, []);
 
@@ -171,6 +191,23 @@ export function ManualBankSettings() {
         logoUrl: detected ? normalizeBankLogoUrl(detected.logoUrl, detected.slug) : prev.logoUrl,
       };
     });
+  }
+
+  async function handleToggleManualTransfer(checked: boolean) {
+    setIsManualTransferEnabled(checked);
+    setSavingToggle(true);
+    try {
+      const res = await saveManualTransferEnabled(checked);
+      if (res.success) {
+        toast.success(`Transfer bank manual berhasil ${checked ? "diaktifkan (ON)" : "dinonaktifkan (OFF)"}`);
+      } else {
+        toast.error("Gagal menyimpan perubahan status transfer manual.");
+      }
+    } catch (err: any) {
+      toast.error("Terjadi kesalahan: " + (err?.message || ""));
+    } finally {
+      setSavingToggle(false);
+    }
   }
 
   async function handleToggleActive(id: string) {
@@ -279,20 +316,44 @@ export function ManualBankSettings() {
   return (
     <div className="space-y-6">
       {/* Top Banner & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-card p-5 shadow-xs">
+      <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
             <Building2 className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-bold text-base text-foreground">Rekening Transfer Bank Manual</h3>
-            <p className="text-xs text-muted-foreground">
+            <div className="flex items-center gap-2.5">
+              <h3 className="font-bold text-base text-foreground">Rekening Transfer Bank Manual</h3>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                  isManualTransferEnabled
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                }`}
+              >
+                {isManualTransferEnabled ? "Aktif (ON)" : "Nonaktif (OFF)"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
               Klien dan lembaga mitra dapat memilih rekening resmi ini dan melakukan transfer langsung tanpa biaya gateway.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+          {/* Switch ON/OFF Toggle */}
+          <div className="flex items-center gap-2.5 rounded-xl border bg-muted/40 px-3.5 py-1.5 shadow-2xs">
+            <span className="text-xs font-semibold text-foreground">
+              {isManualTransferEnabled ? "Aktif (ON)" : "Nonaktif (OFF)"}
+            </span>
+            <Switch
+              checked={isManualTransferEnabled}
+              onCheckedChange={handleToggleManualTransfer}
+              disabled={savingToggle}
+              title="Aktifkan atau nonaktifkan saluran transfer manual"
+            />
+          </div>
+
           <Button
             variant="outline"
             size="sm"
@@ -309,6 +370,21 @@ export function ManualBankSettings() {
           </Button>
         </div>
       </div>
+
+      {/* Warning Callout when Manual Transfer is Disabled */}
+      {!isManualTransferEnabled && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              Transfer Bank Manual Saat Ini Dinonaktifkan (OFF)
+            </p>
+            <p className="mt-0.5 text-[11px]">
+              Tab &ldquo;Transfer Manual&rdquo; disembunyikan dari dialog invoice klien. Klien tidak akan dapat memilih rekening bank manual hingga opsi ini diaktifkan kembali.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Dataset Info Callout */}
       <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-3">

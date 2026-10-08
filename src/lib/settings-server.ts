@@ -114,6 +114,40 @@ export const saveManualBanksServerFn = createServerFn({ method: "POST" })
     }
   });
 
+export const getManualTransferEnabledServerFn = createServerFn({ method: "GET" }).handler(
+  async (): Promise<boolean> => {
+    try {
+      const row = sqlite.prepare("SELECT value FROM settings WHERE key = 'manual_transfer_enabled'").get() as
+        | { value: string }
+        | undefined;
+      if (row?.value !== undefined) {
+        try {
+          const val = JSON.parse(row.value);
+          return Boolean(val);
+        } catch {
+          return row.value === "true" || row.value === "1";
+        }
+      }
+    } catch (err) {
+      console.warn("[Settings] Error loading manual_transfer_enabled:", err);
+    }
+    return true; // default ON
+  }
+);
+
+export const saveManualTransferEnabledServerFn = createServerFn({ method: "POST" })
+  .validator((enabled: boolean) => Boolean(enabled))
+  .handler(async ({ data: enabled }) => {
+    try {
+      sqlite
+        .prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('manual_transfer_enabled', ?, ?)")
+        .run(JSON.stringify(enabled), new Date().toISOString());
+      return { success: true, message: `Transfer bank manual berhasil ${enabled ? "diaktifkan (ON)" : "dinonaktifkan (OFF)"}` };
+    } catch (err: any) {
+      return { success: false, message: err.message || "Gagal menyimpan status transfer bank manual" };
+    }
+  });
+
 export const getSmtpSettingsServerFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<SmtpConfig> => {
     try {

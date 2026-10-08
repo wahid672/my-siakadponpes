@@ -11,6 +11,7 @@ import {
   Zap,
   Check,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { downloadInvoicePdf } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,8 @@ import {
   ManualBankAccount,
   getManualBankAccounts,
   getCachedManualBankAccounts,
+  getCachedManualTransferEnabled,
+  getManualTransferEnabled,
   DEFAULT_MANUAL_BANKS,
 } from "@/lib/manual-banks";
 import { getBankIconUrl, normalizeBankLogoUrl } from "@/lib/bank-data";
@@ -69,9 +72,10 @@ export const Route = createFileRoute("/i/$token")({
         settings: res?.settings ?? null,
         manualBanks: res?.manualBanks ?? null,
         isTripayEnabled: res?.isTripayEnabled ?? true,
+        isManualTransferEnabled: res?.isManualTransferEnabled ?? true,
       };
     } catch {
-      return { invoice: null, settings: null, manualBanks: null, isTripayEnabled: true };
+      return { invoice: null, settings: null, manualBanks: null, isTripayEnabled: true, isManualTransferEnabled: true };
     }
   },
   component: PublicInvoicePage,
@@ -86,6 +90,7 @@ function PublicInvoicePage() {
     settings: GeneralSettings | null;
     manualBanks: ManualBankAccount[] | null;
     isTripayEnabled?: boolean;
+    isManualTransferEnabled?: boolean;
   } | null;
   const initialInvoice = loaderData?.invoice ?? null;
   const initialSettings = loaderData?.settings ?? null;
@@ -101,13 +106,30 @@ function PublicInvoicePage() {
     if (loaderData?.isTripayEnabled !== undefined) return loaderData.isTripayEnabled;
     return getCachedTripaySettings().isEnabled;
   });
-  const [paymentTab, setPaymentTab] = useState<string>("manual");
+  const [isManualTransferEnabled, setIsManualTransferEnabled] = useState<boolean>(() => {
+    if (loaderData?.isManualTransferEnabled !== undefined) return loaderData.isManualTransferEnabled;
+    return getCachedManualTransferEnabled();
+  });
+  const [paymentTab, setPaymentTab] = useState<string>(() => {
+    const initManual = loaderData?.isManualTransferEnabled !== undefined ? loaderData.isManualTransferEnabled : getCachedManualTransferEnabled();
+    const initTripay = loaderData?.isTripayEnabled !== undefined ? loaderData.isTripayEnabled : getCachedTripaySettings().isEnabled;
+    if (!initManual && initTripay) return "tripay";
+    return "manual";
+  });
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(() => {
     return initialSettings || getCachedGeneralSettings();
   });
   const [manualBanks, setManualBanks] = useState<ManualBankAccount[]>(() => {
     return initialManualBanks || getCachedManualBankAccounts();
   });
+
+  useEffect(() => {
+    if (!isManualTransferEnabled && isTripayEnabled) {
+      setPaymentTab("tripay");
+    } else if (isManualTransferEnabled && !isTripayEnabled) {
+      setPaymentTab("manual");
+    }
+  }, [isManualTransferEnabled, isTripayEnabled]);
 
   useEffect(() => {
     let mounted = true;
@@ -119,6 +141,9 @@ function PublicInvoicePage() {
     });
     getTripaySettings().then((cfg) => {
       if (mounted) setIsTripayEnabled(cfg.isEnabled);
+    });
+    getManualTransferEnabled().then((en) => {
+      if (mounted) setIsManualTransferEnabled(en);
     });
 
     const handleUpdate = (e: any) => {
@@ -132,15 +157,22 @@ function PublicInvoicePage() {
         setIsTripayEnabled(e.detail.isEnabled);
       }
     };
+    const handleManualToggleUpdate = (e: any) => {
+      if (e?.detail && typeof e.detail.isEnabled === "boolean") {
+        setIsManualTransferEnabled(e.detail.isEnabled);
+      }
+    };
     window.addEventListener("general_settings_updated", handleUpdate);
     window.addEventListener("manual_banks_updated", handleBanksUpdate);
     window.addEventListener("tripay_settings_updated", handleTripayUpdate);
+    window.addEventListener("manual_transfer_enabled_updated", handleManualToggleUpdate);
 
     return () => {
       mounted = false;
       window.removeEventListener("general_settings_updated", handleUpdate);
       window.removeEventListener("manual_banks_updated", handleBanksUpdate);
       window.removeEventListener("tripay_settings_updated", handleTripayUpdate);
+      window.removeEventListener("manual_transfer_enabled_updated", handleManualToggleUpdate);
     };
   }, []);
 
@@ -154,6 +186,7 @@ function PublicInvoicePage() {
           if (res.settings) setGeneralSettings(res.settings);
           if (res.manualBanks) setManualBanks(res.manualBanks);
           if (res.isTripayEnabled !== undefined) setIsTripayEnabled(res.isTripayEnabled);
+          if (res.isManualTransferEnabled !== undefined) setIsManualTransferEnabled(res.isManualTransferEnabled);
           return res.invoice;
         }
       } catch (err) {
@@ -689,7 +722,7 @@ function PublicInvoicePage() {
               <span className="font-bold text-base text-primary">{rupiah(Number(inv.total))}</span>
             </div>
 
-            {isTripayEnabled ? (
+            {isManualTransferEnabled && isTripayEnabled ? (
               <Tabs value={paymentTab} onValueChange={setPaymentTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="manual" className="flex items-center gap-1.5 text-xs">
@@ -831,7 +864,7 @@ function PublicInvoicePage() {
                   </div>
                 </TabsContent>
               </Tabs>
-            ) : (
+            ) : isManualTransferEnabled ? (
               /* Tampilan langsung Transfer Manual jika Tripay OFF */
               <div className="space-y-3 pt-1">
                 <div className="flex items-center gap-2 border-b pb-2 text-xs font-semibold text-foreground">
@@ -921,6 +954,70 @@ function PublicInvoicePage() {
                     className="bg-primary text-primary-foreground font-semibold"
                   >
                     Gunakan Rekening Ini
+                  </Button>
+                </div>
+              </div>
+            ) : isTripayEnabled ? (
+              /* Tampilan langsung Tripay jika Transfer Manual OFF (Tab Manual Tersembunyi) */
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-2 border-b pb-2 text-xs font-semibold text-foreground">
+                  <Zap className="h-4 w-4 text-primary" /> Pembayaran Otomatis (Tripay)
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Pilih Virtual Account atau QRIS untuk verifikasi pembayaran otomatis instan:
+                </p>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {DEFAULT_TRIPAY_CHANNELS.map((ch) => (
+                    <button
+                      key={ch.code}
+                      type="button"
+                      onClick={() => setSelectedChannel(ch.code)}
+                      className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition ${
+                        selectedChannel === ch.code
+                          ? "border-primary bg-primary/10 text-primary font-semibold"
+                          : "bg-background hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {ch.icon_url && (
+                          <img src={ch.icon_url} alt={ch.name} className="h-6 w-auto max-w-10 object-contain shrink-0" />
+                        )}
+                        <div>
+                          <p className="text-xs font-semibold">{ch.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{ch.group}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="border-t pt-3 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setPayModalOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button onClick={handleStartPayment} disabled={!selectedChannel || isProcessingPayment}>
+                    {isProcessingPayment ? "Menghubungi Tripay..." : "Lanjutkan Pembayaran"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Tampilan jika kedua metode transfer dinonaktifkan */
+              <div className="space-y-4 pt-1">
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-center space-y-2">
+                  <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
+                  <h4 className="font-semibold text-sm text-amber-800 dark:text-amber-200">
+                    Metode Pembayaran Tidak Tersedia
+                  </h4>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    Saat ini saluran transfer manual maupun pembayaran otomatis sedang dinonaktifkan oleh administrator. Silakan hubungi pihak pesantren.
+                  </p>
+                </div>
+                <div className="border-t pt-3 flex justify-end">
+                  <Button variant="outline" onClick={() => setPayModalOpen(false)}>
+                    Tutup
                   </Button>
                 </div>
               </div>

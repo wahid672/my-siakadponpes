@@ -10,6 +10,7 @@ export interface PublicInvoiceResult {
   settings?: GeneralSettings;
   manualBanks?: ManualBankAccount[];
   isTripayEnabled?: boolean;
+  isManualTransferEnabled?: boolean;
   error?: string;
 }
 
@@ -74,7 +75,18 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
         } catch {}
       }
 
-      // 3. Fetch Tripay status (Check toggle on/off)
+      // 3. Fetch manual transfer enabled toggle
+      let isManualTransferEnabled = true;
+      const manualEnabledRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'manual_transfer_enabled'").get() as any;
+      if (manualEnabledRow?.value !== undefined) {
+        try {
+          isManualTransferEnabled = Boolean(JSON.parse(manualEnabledRow.value));
+        } catch {
+          isManualTransferEnabled = manualEnabledRow.value === "true" || manualEnabledRow.value === "1";
+        }
+      }
+
+      // 4. Fetch Tripay status (Check toggle on/off)
       let isTripayEnabled = DEFAULT_TRIPAY_CONFIG.isEnabled;
       const tripayRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'tripay'").get() as any;
       if (tripayRow?.value) {
@@ -89,7 +101,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
         } catch {}
       }
 
-      // 4. Query invoice by ID or invoice_number
+      // 5. Query invoice by ID or invoice_number
       const inv = sqlite
         .prepare("SELECT * FROM invoices WHERE id = ? OR invoice_number = ?")
         .get(id, id) as any;
@@ -123,6 +135,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
           settings: generalSettings,
           manualBanks,
           isTripayEnabled,
+          isManualTransferEnabled,
         };
       }
     } catch (err) {
@@ -135,6 +148,7 @@ export const getPublicInvoiceServerFn = createServerFn({ method: "GET" })
       settings: generalSettings,
       manualBanks,
       isTripayEnabled: DEFAULT_TRIPAY_CONFIG.isEnabled,
+      isManualTransferEnabled: true,
       error: "Invoice tidak ditemukan",
     };
   });
