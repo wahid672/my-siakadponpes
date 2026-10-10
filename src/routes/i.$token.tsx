@@ -16,7 +16,7 @@ import {
 import { downloadInvoicePdf } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/Brand";
-import { InvoicePaymentTable } from "@/components/InvoicePaymentTable";
+import { InvoicePaymentTable, formatTanggalWaktu } from "@/components/InvoicePaymentTable";
 import {
   Dialog,
   DialogContent,
@@ -626,7 +626,7 @@ function PublicInvoicePage() {
                 {inv.paid_at && (
                   <p className="font-semibold text-emerald-600">
                     <span>Dibayar: </span>
-                    <span>{tanggal(inv.paid_at)}</span>
+                    <span>{formatTanggalWaktu(inv.paid_at)}</span>
                   </p>
                 )}
               </div>

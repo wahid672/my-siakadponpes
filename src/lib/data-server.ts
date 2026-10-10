@@ -340,22 +340,22 @@ export const updateUserRoleServerFn = createServerFn({ method: "POST" })
   });
 
 export const markInvoicePaidServerFn = createServerFn({ method: "POST" })
-  .validator((params: { id: string; total: number; userId: string }) => params)
-  .handler(async ({ data: { id, total, userId } }) => {
+  .validator((params: { id: string; total: number; userId: string; paidAt?: string; method?: string }) => params)
+  .handler(async ({ data: { id, total, userId, paidAt, method } }) => {
     try {
-      const now = new Date().toISOString();
+      const paidTimestamp = paidAt ? new Date(paidAt).toISOString() : new Date().toISOString();
       sqlite
         .prepare("UPDATE invoices SET status = 'paid', paid_at = ? WHERE id = ?")
-        .run(now, id);
+        .run(paidTimestamp, id);
 
       const payId = "pay-" + crypto.randomUUID();
       sqlite
         .prepare(
           "INSERT INTO payments (id, invoice_id, user_id, amount, method, status, paid_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         )
-        .run(payId, id, userId, total, "manual_admin", "success", now, now);
+        .run(payId, id, userId, total, method || "Transfer Bank Manual", "paid", paidTimestamp, paidTimestamp);
 
-      return { success: true, message: "Invoice ditandai lunas" };
+      return { success: true, message: "Invoice berhasil ditandai lunas" };
     } catch (err: any) {
       return { success: false, message: err.message || "Gagal memperbarui status" };
     }

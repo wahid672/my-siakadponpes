@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EditInvoiceItemsDialog } from "@/components/EditInvoiceItemsDialog";
 import { DeleteInvoiceSweetAlertModal } from "@/components/DeleteInvoiceSweetAlertModal";
+import { MarkPaidModal } from "@/components/MarkPaidModal";
 import { rupiah, tanggal } from "@/lib/auth";
 import { useAdminInvoices } from "@/lib/admin-queries";
 import {
@@ -58,6 +59,8 @@ function AdminInvoices() {
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [markingPaidInvoice, setMarkingPaidInvoice] = useState<any | null>(null);
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
   const filtered = data.filter((r) => {
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
@@ -76,13 +79,34 @@ function AdminInvoices() {
     qc.invalidateQueries({ queryKey: ["admin-invoices"] });
   }
 
-  async function markAsPaid(id: string, total: number, userId: string) {
-    if (!confirm("Tandai invoice ini sebagai lunas secara manual?")) return;
-    const res = await markInvoicePaidServerFn({ data: { id, total, userId } });
-    if (!res.success) return void toast.error(res.message);
-    toast.success("Invoice ditandai lunas");
-    qc.invalidateQueries({ queryKey: ["admin-invoices"] });
-    qc.invalidateQueries({ queryKey: ["admin-payments"] });
+  async function confirmMarkPaid({ paidAt, method }: { paidAt: string; method: string }) {
+    if (!markingPaidInvoice) return;
+    setIsMarkingPaid(true);
+    try {
+      const res = await markInvoicePaidServerFn({
+        data: {
+          id: markingPaidInvoice.id,
+          total: Number(markingPaidInvoice.total),
+          userId: markingPaidInvoice.user_id,
+          paidAt,
+          method,
+        },
+      });
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(res.message || `Invoice #${markingPaidInvoice.invoice_number} berhasil ditandai lunas.`);
+      setMarkingPaidInvoice(null);
+      qc.invalidateQueries({ queryKey: ["admin-invoices"] });
+      qc.invalidateQueries({ queryKey: ["admin-payments"] });
+      qc.invalidateQueries({ queryKey: ["admin-overview"] });
+      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+    } catch (err: any) {
+      toast.error(err.message || "Gagal memperbarui status");
+    } finally {
+      setIsMarkingPaid(false);
+    }
   }
 
   async function duplicateInvoice(inv: any) {
@@ -237,7 +261,7 @@ function AdminInvoices() {
                             <DropdownMenuItem onClick={() => setEditingInvoice(r)}>
                               <Pencil className="mr-2 h-4 w-4 text-blue-600" /> Edit Rincian Item
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => markAsPaid(r.id, Number(r.total), r.user_id)}>
+                            <DropdownMenuItem onClick={() => setMarkingPaidInvoice(r)}>
                               <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> Tandai Lunas
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => cancelInvoice(r.id)} className="text-muted-foreground">
@@ -250,7 +274,7 @@ function AdminInvoices() {
                         {r.status === "pending" && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => markAsPaid(r.id, Number(r.total), r.user_id)}>
+                            <DropdownMenuItem onClick={() => setMarkingPaidInvoice(r)}>
                               <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> Tandai Lunas
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => cancelInvoice(r.id)} className="text-destructive">
@@ -294,6 +318,15 @@ function AdminInvoices() {
         invoice={deletingInvoice}
         onConfirmDelete={confirmDeleteInvoice}
         isDeleting={isDeleting}
+      />
+
+      {/* Pop Up Tandai Lunas dengan Pengaturan Tanggal & Waktu Transaksi */}
+      <MarkPaidModal
+        open={!!markingPaidInvoice}
+        onOpenChange={(open) => !open && setMarkingPaidInvoice(null)}
+        invoice={markingPaidInvoice}
+        onConfirm={confirmMarkPaid}
+        isSubmitting={isMarkingPaid}
       />
     </div>
   );

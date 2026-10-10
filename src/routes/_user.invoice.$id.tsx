@@ -21,10 +21,12 @@ import {
   completePublicPaymentServerFn,
   saveActivePaymentServerFn,
 } from "@/lib/public-invoice";
+import { markInvoicePaidServerFn } from "@/lib/data-server";
 import { downloadInvoicePdf } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/Brand";
-import { InvoicePaymentTable } from "@/components/InvoicePaymentTable";
+import { InvoicePaymentTable, formatTanggalWaktu } from "@/components/InvoicePaymentTable";
+import { MarkPaidModal } from "@/components/MarkPaidModal";
 import {
   Dialog,
   DialogContent,
@@ -92,6 +94,8 @@ function InvoiceView() {
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(() => getCachedGeneralSettings());
   const [manualBanks, setManualBanks] = useState<ManualBankAccount[]>(() => getCachedManualBankAccounts());
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [markPaidOpen, setMarkPaidOpen] = useState(false);
+  const [isSubmittingMarkPaid, setIsSubmittingMarkPaid] = useState(false);
 
   useEffect(() => {
     if (!isManualTransferEnabled && isTripayEnabled) {
@@ -251,20 +255,17 @@ function InvoiceView() {
     toast.success("Tautan publik disalin ke clipboard!");
   }
 
-  async function markPaid() {
-    const methodStr = activePayment
-      ? activePayment.accountHolder && activePayment.payCode
-        ? `${activePayment.payCode} - ${activePayment.accountHolder}`
-        : activePayment.channel
-      : "Transfer Manual / Admin";
-
+  async function confirmMarkPaid({ paidAt, method }: { paidAt: string; method: string }) {
+    if (!inv) return;
+    setIsSubmittingMarkPaid(true);
     try {
-      const res = await completePublicPaymentServerFn({
+      const res = await markInvoicePaidServerFn({
         data: {
-          invoiceId: inv!.id,
-          amount: inv!.total,
-          method: methodStr,
-          reference: `MANUAL-${Date.now().toString().slice(-6)}`,
+          id: inv.id,
+          total: Number(inv.total),
+          userId: inv.user_id,
+          paidAt,
+          method,
         },
       });
 
@@ -272,12 +273,15 @@ function InvoiceView() {
         return void toast.error(res.message || "Gagal memperbarui status");
       }
 
-      localStorage.removeItem(`siakad_active_payment_${inv!.id}`);
+      localStorage.removeItem(`siakad_active_payment_${inv.id}`);
       setActivePayment(null);
-      toast.success("Invoice ditandai lunas");
+      setMarkPaidOpen(false);
+      toast.success(res.message || "Invoice ditandai lunas");
       qc.invalidateQueries();
     } catch (err: any) {
       toast.error(err.message || "Gagal memperbarui status");
+    } finally {
+      setIsSubmittingMarkPaid(false);
     }
   }
 
@@ -492,7 +496,7 @@ function InvoiceView() {
             </Button>
           )}
           {auth.role === "admin" && (inv.status === "unpaid" || inv.status === "pending") && (
-            <Button variant="secondary" onClick={markPaid}>
+            <Button variant="secondary" onClick={() => setMarkPaidOpen(true)}>
               <CheckCircle2 className="mr-1.5 h-4 w-4 text-emerald-600" /> Tandai Lunas
             </Button>
           )}
@@ -576,7 +580,7 @@ function InvoiceView() {
               {inv.paid_at && (
                 <p className="font-semibold text-emerald-600">
                   <span>Dibayar: </span>
-                  <span>{tanggal(inv.paid_at)}</span>
+                  <span>{formatTanggalWaktu(inv.paid_at)}</span>
                 </p>
               )}
             </div>
@@ -1016,6 +1020,15 @@ function InvoiceView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Pop Up Tandai Lunas dengan Pengaturan Tanggal & Waktu Transaksi */}
+      <MarkPaidModal
+        open={markPaidOpen}
+        onOpenChange={setMarkPaidOpen}
+        invoice={inv}
+        onConfirm={confirmMarkPaid}
+        isSubmitting={isSubmittingMarkPaid}
+      />
     </div>
   );
 }
