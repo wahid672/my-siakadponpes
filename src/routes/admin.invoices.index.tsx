@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EditInvoiceItemsDialog } from "@/components/EditInvoiceItemsDialog";
+import { DeleteInvoiceSweetAlertModal } from "@/components/DeleteInvoiceSweetAlertModal";
 import { rupiah, tanggal } from "@/lib/auth";
 import { useAdminInvoices } from "@/lib/admin-queries";
 import {
@@ -55,6 +56,8 @@ function AdminInvoices() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filtered = data.filter((r) => {
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
@@ -89,18 +92,25 @@ function AdminInvoices() {
     qc.invalidateQueries({ queryKey: ["admin-invoices"] });
   }
 
-  async function handleDeleteInvoice(inv: any) {
-    if (inv.status !== "unpaid") {
-      toast.error("Hanya invoice dengan status Belum Bayar yang dapat dihapus.");
-      return;
+  async function confirmDeleteInvoice(inv: any) {
+    setIsDeleting(true);
+    try {
+      const res = await deleteInvoiceServerFn({ data: inv.id });
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(res.message || `Invoice #${inv.invoice_number} berhasil dihapus.`);
+      setDeletingInvoice(null);
+      qc.invalidateQueries({ queryKey: ["admin-invoices"] });
+      qc.invalidateQueries({ queryKey: ["admin-payments"] });
+      qc.invalidateQueries({ queryKey: ["admin-overview"] });
+      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghapus invoice");
+    } finally {
+      setIsDeleting(false);
     }
-    if (!confirm(`Hapus invoice #${inv.invoice_number}? Tindakan ini permanen dan tidak dapat dibatalkan.`)) {
-      return;
-    }
-    const res = await deleteInvoiceServerFn({ data: inv.id });
-    if (!res.success) return void toast.error(res.message);
-    toast.success(`Invoice #${inv.invoice_number} berhasil dihapus.`);
-    qc.invalidateQueries({ queryKey: ["admin-invoices"] });
   }
 
   function shareWhatsApp(inv: any) {
@@ -220,7 +230,7 @@ function AdminInvoices() {
                           <Copy className="mr-2 h-4 w-4" /> Duplikasi Invoice
                         </DropdownMenuItem>
 
-                        {/* OPSI KHUSUS STATUS BELUM BAYAR (Bisa Diedit & Dihapus) */}
+                        {/* OPSI KHUSUS STATUS BELUM BAYAR (Bisa Diedit Rincian Item, Tandai Lunas, Batalkan) */}
                         {r.status === "unpaid" && (
                           <>
                             <DropdownMenuSeparator />
@@ -233,14 +243,10 @@ function AdminInvoices() {
                             <DropdownMenuItem onClick={() => cancelInvoice(r.id)} className="text-muted-foreground">
                               <XCircle className="mr-2 h-4 w-4" /> Batalkan Invoice
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDeleteInvoice(r)} className="text-destructive font-medium">
-                              <Trash2 className="mr-2 h-4 w-4" /> Hapus Invoice
-                            </DropdownMenuItem>
                           </>
                         )}
 
-                        {/* OPSI KHUSUS STATUS PENDING (Hanya Konfirmasi Lunas / Batal - TIDAK BISA EDIT ATAU HAPUS) */}
+                        {/* OPSI KHUSUS STATUS PENDING (Hanya Konfirmasi Lunas / Batal) */}
                         {r.status === "pending" && (
                           <>
                             <DropdownMenuSeparator />
@@ -252,6 +258,15 @@ function AdminInvoices() {
                             </DropdownMenuItem>
                           </>
                         )}
+
+                        {/* OPSI HAPUS INVOICE (Berlaku untuk SEMUA STATUS) */}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeletingInvoice(r)}
+                          className="text-destructive font-medium focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Hapus Invoice
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -270,6 +285,15 @@ function AdminInvoices() {
         onSuccess={() => {
           qc.invalidateQueries({ queryKey: ["admin-invoices"] });
         }}
+      />
+
+      {/* SweetAlert Popup Konfirmasi Hapus Invoice (Mengetik kata "delete") */}
+      <DeleteInvoiceSweetAlertModal
+        open={!!deletingInvoice}
+        onOpenChange={(open) => !open && setDeletingInvoice(null)}
+        invoice={deletingInvoice}
+        onConfirmDelete={confirmDeleteInvoice}
+        isDeleting={isDeleting}
       />
     </div>
   );

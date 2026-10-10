@@ -275,13 +275,15 @@ export const deleteInvoiceServerFn = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
-      const existing = sqlite.prepare("SELECT status FROM invoices WHERE id = ?").get(id) as any;
+      const existing = sqlite.prepare("SELECT id, invoice_number, status FROM invoices WHERE id = ?").get(id) as any;
       if (!existing) return { success: false, message: "Invoice tidak ditemukan" };
-      if (existing.status !== "unpaid") {
-        return { success: false, message: "Hanya invoice dengan status Belum Bayar yang dapat dihapus." };
-      }
+
+      // Hapus riwayat pembayaran terkait invoice (jika ada) untuk menjaga integritas data
+      sqlite.prepare("DELETE FROM payments WHERE invoice_id = ?").run(id);
+      // Hapus record invoice
       sqlite.prepare("DELETE FROM invoices WHERE id = ?").run(id);
-      return { success: true, message: "Invoice berhasil dihapus" };
+
+      return { success: true, message: `Invoice #${existing.invoice_number} berhasil dihapus` };
     } catch (err: any) {
       return { success: false, message: err.message || "Gagal menghapus invoice" };
     }
