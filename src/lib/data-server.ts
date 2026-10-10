@@ -227,7 +227,7 @@ export const updateInvoiceItemsServerFn = createServerFn({ method: "POST" })
   .validator(
     (params: {
       id: string;
-      items: Array<{ description: string; quantity: number; unit_price: number; amount: number }>;
+      items: any[];
       tax_rate: number;
       discount: number;
       subtotal: number;

@@ -19,8 +19,10 @@ import { updateInvoiceItemsServerFn } from "@/lib/data-server";
 export interface InvoiceItem {
   description: string;
   quantity: number;
+  unit?: string;
   unit_price: number;
   amount: number;
+  price?: number;
 }
 
 interface EditInvoiceItemsDialogProps {
@@ -52,18 +54,34 @@ export function EditInvoiceItemsDialog({
 
       const initialItems: InvoiceItem[] =
         rawItems.length > 0
-          ? rawItems.map((it: any) => ({
-              description: it.description || "",
-              quantity: Number(it.quantity) || 1,
-              unit_price: Number(it.unit_price) || 0,
-              amount: (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
-            }))
+          ? rawItems.map((it: any) => {
+              const rawPrice =
+                it.unit_price !== undefined && it.unit_price !== null && it.unit_price !== ""
+                  ? it.unit_price
+                  : it.amount !== undefined && it.amount !== null && it.amount !== ""
+                  ? it.amount
+                  : it.price !== undefined && it.price !== null && it.price !== ""
+                  ? it.price
+                  : 0;
+              const unitPrice = Number(rawPrice) || 0;
+              const qty = Number(it.quantity) || 1;
+              return {
+                description: it.description || "",
+                quantity: qty,
+                unit: it.unit || "Paket",
+                unit_price: unitPrice,
+                amount: qty * unitPrice,
+                price: unitPrice,
+              };
+            })
           : [
               {
                 description: "",
                 quantity: 1,
+                unit: "Paket",
                 unit_price: 0,
                 amount: 0,
+                price: 0,
               },
             ];
 
@@ -99,6 +117,7 @@ export function EditInvoiceItemsDialog({
       } else if (field === "unit_price") {
         const p = Math.max(0, parseFloat(value) || 0);
         cur.unit_price = p;
+        cur.price = p;
         cur.amount = cur.quantity * p;
       }
       copy[index] = cur;
@@ -112,8 +131,10 @@ export function EditInvoiceItemsDialog({
       {
         description: "",
         quantity: 1,
+        unit: "Paket",
         unit_price: 0,
         amount: 0,
+        price: 0,
       },
     ]);
   }
@@ -144,12 +165,19 @@ export function EditInvoiceItemsDialog({
 
     setIsSubmitting(true);
     try {
-      const normalizedItems = items.map((it) => ({
-        description: it.description.trim(),
-        quantity: Number(it.quantity),
-        unit_price: Number(it.unit_price),
-        amount: Number(it.quantity) * Number(it.unit_price),
-      }));
+      const normalizedItems = items.map((it) => {
+        const qty = Number(it.quantity) || 1;
+        const uPrice = Number(it.unit_price) || 0;
+        return {
+          description: it.description.trim(),
+          quantity: qty,
+          unit: it.unit || "Paket",
+          unit_price: uPrice,
+          amount: uPrice,
+          price: uPrice,
+          total: qty * uPrice,
+        };
+      });
 
       const res = await updateInvoiceItemsServerFn({
         data: {
